@@ -1,0 +1,6 @@
+interface:
+  display_name: "Wiki Garden"
+  short_description: "Maintain locale-centered Markdown and HTML knowledge bases."
+  default_prompt: "Use Wiki Garden to ingest, query, lint, or refine my knowledge base in my configured locale."
+
+
