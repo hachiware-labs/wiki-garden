@@ -199,6 +199,18 @@ List installed skills:
 npx skills list
 ```
 
+## Repository Entrypoints
+
+The canonical skill source in this repository is:
+
+```text
+.agents/skills/wiki-garden/
+```
+
+The top-level `skills/wiki-garden/` directory mirrors the same skill package for distribution tools and users that expect the Agent Skills layout at `skills/<skill-name>/`.
+
+When updating the skill, edit `.agents/skills/wiki-garden/` first, then refresh `skills/wiki-garden/` so both entrypoints stay aligned.
+
 ## Codex
 
 This repository includes the Codex-compatible skill path:
@@ -272,5 +284,4 @@ Use $wiki-garden to lint knowledge/ for scope leaks, orphan HTML artifacts, stal
 ## Non-goals
 
 The MVP does not implement a database, vector search, automatic session logging, web UI, MCP server, GitHub Actions automation, or raw source downloading. It is an instruction-only skill for maintaining Markdown and static HTML knowledge.
-
 
