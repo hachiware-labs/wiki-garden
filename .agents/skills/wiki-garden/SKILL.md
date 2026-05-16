@@ -7,6 +7,8 @@ description: Maintain a locale-centered, Karpathy-inspired Markdown and static H
 
 Use this skill to keep a durable knowledge base from current work, source files, and project decisions. Preserve distilled knowledge, not chat transcripts.
 
+Wiki Garden follows Karpathy's LLM Wiki pattern: raw sources are immutable source-of-truth inputs, the wiki is the maintained Markdown knowledge layer, and the skill instructions act as the operating schema for ingest, query, lint, and refinement. The goal is ingest-time knowledge compilation, not repeated query-time reconstruction from raw chunks.
+
 The knowledge base is Markdown-first. Use static HTML as a first-class knowledge artifact when the knowledge is structural or visual enough that Markdown would obscure it: diagrams, timelines, decision trees, architecture maps, concept maps, matrices, dependency graphs, or interactive explanations.
 
 Canonical knowledge is locale-centered. Write and maintain normal knowledge pages in the configured `knowledge_locale`, even when sources are in another language. Preserve original source language in raw sources, citations, proper nouns, code identifiers, API names, and important first-use terms.
@@ -69,6 +71,8 @@ knowledge/
 Raw sources live inside the selected knowledge root. Treat `raw/` as the immutable source layer: humans add or capture source material there, and agents read it but do not rewrite it during ingest, query, lint, or refine.
 
 Use `sources/` for source summary pages. A source summary is a canonical Markdown page for one raw source, such as one paper, one article, one web page capture, one specification, or one document. It should link back to the raw source when available and forward to related concept, method, comparison, decision, or project pages.
+
+Agent conversation insights are not raw sources by default. When ingesting from a coding-agent session, extract only durable knowledge and write it to the appropriate canonical pages. Do not create transcript pages, generic session summaries, or raw session logs unless the user explicitly asks for that archival behavior.
 
 Global knowledge is reusable across projects. Project-local knowledge is only true for a named project unless explicitly generalized later.
 
@@ -233,20 +237,22 @@ When ingesting a file, raw source, or useful session insight:
 
 1. Resolve the knowledge root.
 2. Resolve the knowledge locale.
-3. Ensure raw source material belongs under `<knowledge-root>/raw/sources/` when the task is ingesting an external source. If the user provided a file outside the knowledge root, read it as the source and, when asked to preserve it, copy or capture the raw material under `raw/sources/` before creating summaries. Do not rewrite existing raw files.
-4. For web sources, preserve at least the source URL, capture date, and source title in raw metadata. Prefer a Markdown text extraction for ordinary articles and add an HTML snapshot only when fidelity, layout, or later verification matters.
-5. Read the input, or extract durable claims from the current session if no file is given.
-6. Preserve source language for raw sources and citations.
-7. Create or update a one-source summary page under `<knowledge-root>/sources/<type>/` when ingesting a durable external source. Use `papers/`, `articles/`, `web/`, or `docs/` when the type is clear, and include source metadata, concise summary, key claims, limitations, citations or raw links, related concepts, and open questions.
-8. Distill reusable knowledge into the knowledge locale.
-9. Classify each item as source summary, global knowledge, project-local context, decision, lesson, open question, artifact reference, HTML artifact candidate, glossary term, or transient discard.
-10. Search existing indexes and likely pages before creating new pages.
-11. Re-read relevant existing concept, method, comparison, and project pages, then update them with cross-source observations: common patterns, contradictions, refinements, complementary evidence, and questions raised by the new source.
-12. Merge into existing Markdown pages in the knowledge locale where possible.
-13. Create a new Markdown page only when the knowledge has a stable topic.
-14. Create or update an HTML artifact only when structure or visualization materially improves understanding; write visible text in the knowledge locale.
-15. Update the relevant `index.md`.
-16. Update `log.md`.
+3. Determine whether the input is an external source or a conversation insight.
+4. For an external source, ensure raw source material belongs under `<knowledge-root>/raw/sources/`. If the user provided a file outside the knowledge root, read it as the source and, when asked to preserve it, copy or capture the raw material under `raw/sources/` before creating summaries. Do not rewrite existing raw files.
+5. For web sources, preserve at least the source URL, capture date, and source title in raw metadata. Prefer a Markdown text extraction for ordinary articles and add an HTML snapshot only when fidelity, layout, or later verification matters.
+6. For a conversation insight, extract only durable claims, decisions, lessons, constraints, terminology, methods, or open questions from the current agent session. Do not create a source summary, transcript page, chat archive, or raw session log by default.
+7. Read the input, or extract durable claims from the current session if no file is given.
+8. Preserve source language for raw sources and citations.
+9. Create or update a one-source summary page under `<knowledge-root>/sources/<type>/` only when ingesting a durable external source. Use `papers/`, `articles/`, `web/`, or `docs/` when the type is clear, and include source metadata, concise summary, key claims, limitations, citations or raw links, related concepts, and open questions.
+10. Distill reusable knowledge into the knowledge locale.
+11. Classify each item as source summary, global knowledge, project-local context, decision, lesson, open question, artifact reference, HTML artifact candidate, glossary term, or transient discard.
+12. Search existing indexes and likely pages before creating new pages.
+13. Re-read relevant existing concept, method, comparison, and project pages, then update them with cross-source or cross-session observations: common patterns, contradictions, refinements, complementary evidence, and questions raised by the new source or session insight.
+14. Merge into existing Markdown pages in the knowledge locale where possible.
+15. Create a new Markdown page only when the knowledge has a stable topic.
+16. Create or update an HTML artifact only when structure or visualization materially improves understanding; write visible text in the knowledge locale.
+17. Update the relevant `index.md`.
+18. Update `log.md`.
 
 Do not save session summaries as knowledge. Do not rewrite raw sources. Preserve citations or source references when available. Put uncertain claims or uncertain translations in `open-questions.md` or mark them as tentative. Avoid bulk or automatic ingestion that would make the knowledge base grow faster than the user can review; when source selection is unclear, prefer a small curated ingest set.
 
