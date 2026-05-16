@@ -9,6 +9,8 @@ raw sources / current work
   ↓
 ingest
   ↓
+source summaries
+  ↓
 global knowledge / project-local knowledge
   ↓
 query
@@ -27,6 +29,8 @@ Wiki Garden は、Karpathy の LLM Wiki 原則を、実運用可能な Markdown 
 この Skill は、以下を実現する。
 
 - raw source や現在作業中の会話から、再利用可能な知見を抽出する
+- raw source を指定された knowledge root 配下の `raw/` に保ち、必要に応じて参照・保存する
+- 1つの外部ソースにつき 1つの source summary ページを作る
 - 知見を **global knowledge** と **project-local knowledge** に分類する
 - 知見を session summary として保存せず、正規の Markdown ページへ反映する
 - 既存知識を query し、作業に必要な文脈を取得する
@@ -318,6 +322,18 @@ This project uses `ja-JP` as its canonical knowledge locale.
 
 ```text
 knowledge/
+  raw/
+    sources/
+      papers/
+      articles/
+      web/
+      docs/
+  sources/
+    index.md
+    papers/
+    articles/
+    web/
+    docs/
   global/
     index.md
     log.md
@@ -351,8 +367,6 @@ knowledge/
       artifacts.md
       *.html
 
-  raw/
-    sources/
 ```
 
 Markdown と HTML は、同じ知識カテゴリ内に並べてよい。HTML は「別種の格納場所」ではなく、「同じ知識構造に属する別表現」として扱う。
@@ -415,10 +429,53 @@ log.md
 ```text
 raw/sources/
   論文、記事、仕様書、資料、メモ、成果物など
+  papers/
+  articles/
+  web/
+  docs/
 ```
+
+`raw/` は、選択された knowledge root の直下で管理する。ユーザーが指定したフォルダを knowledge root とする場合、そのフォルダ内に `raw/` を置く。raw source は一次資料であり、ingest / query / lint / refine で勝手に書き換えない。
+
+Web ページを raw source として扱う場合は、少なくとも URL、取得日、タイトル、保存形式を残す。通常の記事は本文抽出 Markdown を優先し、レイアウトや後日の厳密検証が重要な場合だけ HTML snapshot を併置する。
 
 CLI 対話セッションの生ログは、MVP では標準保存しない。  
 必要な場合のみ、将来オプションとして `raw/sessions/` を検討する。
+
+### 7.4 source summaries
+
+外部ソースを ingest した結果として、1ソース1ページの summary を置く。
+
+```text
+sources/
+  index.md
+  papers/
+    *.md
+  articles/
+    *.md
+  web/
+    *.md
+  docs/
+    *.md
+```
+
+source summary は raw source と横断知識ページの中間層である。各ページは raw source への参照、要約、主要 claim、根拠または詳細、限界、関連する concept / method / comparison / decision / project context、未解決問いを含む。
+
+source summary の推奨 frontmatter:
+
+```yaml
+---
+type: source-summary
+source_type: paper
+scope: global
+source_path:
+source_url:
+captured_at:
+title:
+authors:
+year:
+---
+```
 
 ---
 
@@ -480,12 +537,18 @@ set_knowledge_locale --project en-US
 
 #### 動作
 
-1. 入力がファイルなら内容を読む
-2. knowledge root と knowledge locale を解決する
-3. 入力が明示されない場合は現在セッションから有用な知見を抽出する
-4. 原資料や citation は原文のまま保持する
-5. 再利用可能な知識を knowledge locale に蒸留する
-6. 知見候補を分類する
+1. knowledge root と knowledge locale を解決する
+2. 外部ソースを ingest する場合、その source が `<knowledge-root>/raw/sources/` に属するものとして扱う
+3. 入力ファイルが knowledge root の外にあり、ユーザーが raw 保存を求めている場合は、raw source として `raw/sources/` に保存または capture する
+4. 既存の raw source は書き換えない
+5. Web source の場合は URL、取得日、タイトル、保存形式を raw metadata として保持する
+6. 入力がファイルなら内容を読む
+7. 入力が明示されない場合は現在セッションから有用な知見を抽出する
+8. 原資料や citation は原文のまま保持する
+9. 外部ソースの場合、`sources/<type>/` に 1ソース1ページの summary を作成または更新する
+10. 再利用可能な知識を knowledge locale に蒸留する
+11. 知見候補を分類する
+   - source summary
    - global knowledge
    - project-local context
    - decision
@@ -495,21 +558,26 @@ set_knowledge_locale --project en-US
    - HTML knowledge artifact candidate
    - glossary term
    - transient / discard
-7. 既存ページを検索する
-8. 既存ページへ knowledge locale で統合する
-9. 必要な場合だけ新規ページを作る
-10. 構造的な図説が有効な場合は、関連 Markdown と同じ意味的フォルダに HTML 知識ページを knowledge locale で作る
-11. `index.md` を更新する
-12. `log.md` に変更履歴を書く
+12. 既存ページを検索する
+13. 関連する concept / method / comparison / project ページを読み直す
+14. 新しい source summary から、既存知識との共通点、対立点、補完関係、分類の更新、未解決問いを抽出する
+15. 既存ページへ knowledge locale で統合する
+16. 必要な場合だけ新規ページを作る
+17. 構造的な図説が有効な場合は、関連 Markdown と同じ意味的フォルダに HTML 知識ページを knowledge locale で作る
+18. `index.md` を更新する
+19. `log.md` に変更履歴を書く
 
 #### 制約
 
 - セッション要約を保存しない
 - raw source を勝手に書き換えない
+- 外部ソースの ingest では、原則として raw source と source summary と横断知識を分ける
+- source summary は raw source を代替するものではなく、raw source へ戻れる索引として扱う
 - 出典や根拠がある場合は残す
 - 不確実なものは断定せず open question にする
 - HTML を使う場合も、`index.md`、`log.md`、関連 Markdown から辿れるようにする
 - 外国語ソースは原文を保持し、正規知識は knowledge locale で記述する
+- ユーザーが理解できない速度で wiki が膨張しないよう、source selection は curated set を優先する
 
 ---
 
@@ -965,5 +1033,3 @@ Do not preserve conversations. Preserve distilled knowledge.
 ```text
 A Karpathy-inspired skill for maintaining Markdown knowledge.
 ```
-
-

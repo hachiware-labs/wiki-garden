@@ -65,9 +65,10 @@ Locale resolution order:
 
 ```text
 knowledge/
+  raw/
+  sources/
   global/
   projects/
-  raw/
 ```
 
 ## Global Knowledge
@@ -118,15 +119,72 @@ Use project-local knowledge for constraints, decisions, terms, artifacts, lesson
 
 ```text
 <knowledge-root>/raw/sources/
+  papers/
+  articles/
+  web/
+  docs/
 ```
 
-Raw sources are source material. Do not rewrite them during ingest, lint, or refine. Link to them from canonical pages when useful.
+Raw sources are source material inside the selected knowledge root. Do not rewrite them during ingest, query, lint, or refine. Link to them from source summaries and canonical pages when useful.
+
+For web sources, keep enough raw metadata to identify the captured source later:
+
+- original URL
+- title
+- capture date
+- source format, such as `markdown-extract` or `html-snapshot`
+
+Prefer Markdown text extraction for ordinary web articles. Keep an HTML snapshot beside the metadata only when exact page structure, layout, or later verification matters.
+
+## Source Summaries
+
+```text
+<knowledge-root>/sources/
+  index.md
+  papers/
+    *.md
+  articles/
+    *.md
+  web/
+    *.md
+  docs/
+    *.md
+```
+
+Source summaries are one-source Markdown pages produced by ingest. They are the bridge between immutable raw material and cross-source knowledge pages. Each summary should link back to its raw source when available and link forward to related concepts, methods, comparisons, decisions, project context, or open questions.
+
+Recommended source summary metadata:
+
+```yaml
+---
+type: source-summary
+source_type: paper
+scope: global
+source_path:
+source_url:
+captured_at:
+title:
+authors:
+year:
+---
+```
+
+Recommended sections:
+
+- Summary
+- Key Claims
+- Evidence or Details
+- Limitations
+- Related Knowledge
+- Open Questions
 
 ## Markdown Pages
 
 Markdown pages should be concise and durable. Prefer stable topic pages over session notes.
 
 Write Markdown pages in the knowledge locale. When source material is in another language, include important original terms on first use and preserve source references.
+
+Concept, method, and comparison pages should be maintained as cross-source synthesis pages, not just topic definitions. When ingest adds a relevant source, update these pages with common patterns, contradictions, refinements, complementary evidence, and questions that only become visible across multiple sources.
 
 Recommended metadata for decision pages:
 
@@ -165,5 +223,3 @@ Required expectations:
 - project HTML also listed in `artifacts.md`
 
 Avoid using HTML for decoration-only pages or content that is clearer as plain Markdown.
-
-

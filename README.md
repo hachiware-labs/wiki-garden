@@ -10,11 +10,11 @@ Do not preserve conversations. Preserve distilled knowledge.
 
 Wiki Garden turns useful information from source files, current work, and project decisions into a durable knowledge base.
 
-The knowledge base is Markdown-first, but not Markdown-only. Use Markdown for prose knowledge, decisions, lessons, indexes, and open questions. Use static HTML for structural explanations that benefit from diagrams, timelines, maps, matrices, or lightweight interaction.
+The knowledge base is Markdown-first, but not Markdown-only. Use Markdown for source summaries, prose knowledge, decisions, lessons, indexes, and open questions. Use static HTML for structural explanations that benefit from diagrams, timelines, maps, matrices, or lightweight interaction.
 
 ## Core Operations
 
-- `ingest`: Extract durable knowledge from files, raw sources, or current work and merge it into canonical pages.
+- `ingest`: Preserve or read raw sources, create one-source summary pages, and merge cross-source knowledge into canonical pages.
 - `query`: Read project-local and global knowledge to answer the current question.
 - `lint`: Detect contradictions, stale claims, missing sources, mistranslations, scope leaks, orphan pages, and broken links.
 - `refine`: Improve structure by merging, splitting, moving, indexing, or converting visual knowledge into HTML artifacts.
@@ -35,7 +35,7 @@ The knowledge base is Markdown-first, but not Markdown-only. Use Markdown for pr
 | `set_knowledge_locale` | Set the canonical language for Markdown and HTML knowledge pages. Foreign-language sources are distilled into this locale. | `Use $wiki-garden set_knowledge_locale ja-JP` |
 | `get_knowledge_locale` | Show the currently effective knowledge locale and which config source selected it. Does not modify files. | `Use $wiki-garden get_knowledge_locale` |
 | `set_knowledge_locale --project` | Override the knowledge locale for the current repository. | `Use $wiki-garden set_knowledge_locale --project en-US` |
-| `ingest` | Extract durable knowledge from files, raw sources, or current work and merge it into canonical Markdown or HTML knowledge pages. | `Use $wiki-garden to ingest docs/api-notes.md into the checkout-redesign project.` |
+| `ingest` | Preserve or read raw source material, create a one-source summary page under `sources/`, and merge cross-source knowledge into canonical Markdown or HTML pages. | `Use $wiki-garden to ingest docs/api-notes.md into the checkout-redesign project.` |
 | `query` | Read global and project-local knowledge to answer the current question. Related HTML knowledge pages are included. | `Use $wiki-garden to query what we know about retrieval pipeline tradeoffs.` |
 | `lint` | Detect contradictions, stale claims, weak sources, mistranslations, scope leaks, broken links, orphan pages, and orphan HTML artifacts. | `Use $wiki-garden to lint knowledge/ for stale claims.` |
 | `refine` | Improve the knowledge base by merging, splitting, moving, indexing, cross-linking, or converting structural explanations into HTML artifacts. | `Use $wiki-garden to refine the checkout-redesign project knowledge.` |
@@ -52,7 +52,7 @@ Aliases for `set_knowledge_path`: `set_path`, `set-root`, `configure root`.
 | `set_knowledge_locale` | Markdown / HTML の正規知識ページで使う中心言語を設定する。外国語ソースはこのロケールへ蒸留して取り込む。 | `Use $wiki-garden set_knowledge_locale ja-JP` |
 | `get_knowledge_locale` | 現在有効な knowledge locale と、それを選んだ設定元を表示する。ファイルは変更しない。 | `Use $wiki-garden get_knowledge_locale` |
 | `set_knowledge_locale --project` | 現在のリポジトリだけで使う knowledge locale を設定する。 | `Use $wiki-garden set_knowledge_locale --project en-US` |
-| `ingest` | ファイル、raw source、現在の作業から永続化すべき知識を抽出し、ロケール言語の Markdown または HTML 知識ページへ統合する。 | `Use $wiki-garden to ingest docs/api-notes.md into the checkout-redesign project.` |
+| `ingest` | raw source を保持または参照し、`sources/` に 1 ソース 1 ページの summary を作り、横断知識を Markdown または HTML の正規ページへ統合する。 | `Use $wiki-garden to ingest docs/api-notes.md into the checkout-redesign project.` |
 | `query` | global knowledge と project-local knowledge を読み、ロケール言語で現在の問いに必要な文脈を取得する。関連 HTML 知識ページも対象にする。 | `Use $wiki-garden to query what we know about retrieval pipeline tradeoffs.` |
 | `lint` | 矛盾、古さ、根拠不足、翻訳ゆれ、scope 混入、リンク切れ、孤立ページ、孤立 HTML を検出する。 | `Use $wiki-garden to lint knowledge/ for stale claims.` |
 | `refine` | 重複統合、分割、移動、用語統一、index/log 整理、相互リンク追加、構造説明の HTML 化などで知識ベースを洗練する。 | `Use $wiki-garden to refine the checkout-redesign project knowledge.` |
@@ -124,6 +124,18 @@ Foreign-language sources should not be overwritten. Keep raw sources and citatio
 
 ```text
 knowledge/
+  raw/
+    sources/
+      papers/
+      articles/
+      web/
+      docs/
+  sources/
+    index.md
+    papers/
+    articles/
+    web/
+    docs/
   global/
     index.md
     log.md
@@ -155,9 +167,13 @@ knowledge/
       open-questions.md
       artifacts.md
       *.html
-  raw/
-    sources/
 ```
+
+`raw/` is managed inside the selected knowledge root. It is the immutable source layer: humans add papers, articles, web captures, documents, or other source material there, and agents read it without rewriting it.
+
+`sources/` contains one-source summary pages created by ingest. These summaries connect raw material to reusable knowledge by linking back to raw sources and forward to concepts, methods, comparisons, decisions, project context, or open questions.
+
+For HTML web pages, keep at least the original URL, capture date, title, and source format. Prefer Markdown text extraction for ordinary articles; add an HTML snapshot only when exact layout or later verification matters.
 
 ## HTML Artifacts
 
@@ -284,4 +300,3 @@ Use $wiki-garden to lint knowledge/ for scope leaks, orphan HTML artifacts, stal
 ## Non-goals
 
 The MVP does not implement a database, vector search, automatic session logging, web UI, MCP server, GitHub Actions automation, or raw source downloading. It is an instruction-only skill for maintaining Markdown and static HTML knowledge.
-

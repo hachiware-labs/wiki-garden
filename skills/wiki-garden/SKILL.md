@@ -21,6 +21,18 @@ Prefer this layout under the selected root:
 
 ```text
 knowledge/
+  raw/
+    sources/
+      papers/
+      articles/
+      web/
+      docs/
+  sources/
+    index.md
+    papers/
+    articles/
+    web/
+    docs/
   global/
     index.md
     log.md
@@ -52,9 +64,11 @@ knowledge/
       open-questions.md
       artifacts.md
       *.html
-  raw/
-    sources/
 ```
+
+Raw sources live inside the selected knowledge root. Treat `raw/` as the immutable source layer: humans add or capture source material there, and agents read it but do not rewrite it during ingest, query, lint, or refine.
+
+Use `sources/` for source summary pages. A source summary is a canonical Markdown page for one raw source, such as one paper, one article, one web page capture, one specification, or one document. It should link back to the raw source when available and forward to related concept, method, comparison, decision, or project pages.
 
 Global knowledge is reusable across projects. Project-local knowledge is only true for a named project unless explicitly generalized later.
 
@@ -219,18 +233,22 @@ When ingesting a file, raw source, or useful session insight:
 
 1. Resolve the knowledge root.
 2. Resolve the knowledge locale.
-3. Read the input, or extract durable claims from the current session if no file is given.
-4. Preserve source language for raw sources and citations.
-5. Distill reusable knowledge into the knowledge locale.
-6. Classify each item as global knowledge, project-local context, decision, lesson, open question, artifact reference, HTML artifact candidate, glossary term, or transient discard.
-7. Search existing indexes and likely pages before creating new pages.
-8. Merge into existing Markdown pages in the knowledge locale where possible.
-9. Create a new Markdown page only when the knowledge has a stable topic.
-10. Create or update an HTML artifact only when structure or visualization materially improves understanding; write visible text in the knowledge locale.
-11. Update the relevant `index.md`.
-12. Update `log.md`.
+3. Ensure raw source material belongs under `<knowledge-root>/raw/sources/` when the task is ingesting an external source. If the user provided a file outside the knowledge root, read it as the source and, when asked to preserve it, copy or capture the raw material under `raw/sources/` before creating summaries. Do not rewrite existing raw files.
+4. For web sources, preserve at least the source URL, capture date, and source title in raw metadata. Prefer a Markdown text extraction for ordinary articles and add an HTML snapshot only when fidelity, layout, or later verification matters.
+5. Read the input, or extract durable claims from the current session if no file is given.
+6. Preserve source language for raw sources and citations.
+7. Create or update a one-source summary page under `<knowledge-root>/sources/<type>/` when ingesting a durable external source. Use `papers/`, `articles/`, `web/`, or `docs/` when the type is clear, and include source metadata, concise summary, key claims, limitations, citations or raw links, related concepts, and open questions.
+8. Distill reusable knowledge into the knowledge locale.
+9. Classify each item as source summary, global knowledge, project-local context, decision, lesson, open question, artifact reference, HTML artifact candidate, glossary term, or transient discard.
+10. Search existing indexes and likely pages before creating new pages.
+11. Re-read relevant existing concept, method, comparison, and project pages, then update them with cross-source observations: common patterns, contradictions, refinements, complementary evidence, and questions raised by the new source.
+12. Merge into existing Markdown pages in the knowledge locale where possible.
+13. Create a new Markdown page only when the knowledge has a stable topic.
+14. Create or update an HTML artifact only when structure or visualization materially improves understanding; write visible text in the knowledge locale.
+15. Update the relevant `index.md`.
+16. Update `log.md`.
 
-Do not save session summaries as knowledge. Do not rewrite raw sources. Preserve citations or source references when available. Put uncertain claims or uncertain translations in `open-questions.md` or mark them as tentative.
+Do not save session summaries as knowledge. Do not rewrite raw sources. Preserve citations or source references when available. Put uncertain claims or uncertain translations in `open-questions.md` or mark them as tentative. Avoid bulk or automatic ingestion that would make the knowledge base grow faster than the user can review; when source selection is unclear, prefer a small curated ingest set.
 
 ### query
 
@@ -240,11 +258,12 @@ When answering from the knowledge base:
 2. Resolve the knowledge locale.
 3. Answer in the knowledge locale unless the user explicitly asks for another language.
 4. Read project-local knowledge first when a project is named.
-5. Read global indexes and only then load relevant pages.
-6. Include relevant HTML artifacts by reading their title, metadata, visible text, and structure.
-7. Distinguish global facts from project-local assumptions.
-8. Surface stale, contradictory, weakly sourced, or translation-sensitive knowledge.
-9. If the answer creates durable new knowledge, mention it as an ingest candidate in the knowledge locale.
+5. Read global and source summary indexes, then load relevant pages.
+6. Include source summary pages when they provide the best evidence trail back to raw sources.
+7. Include relevant HTML artifacts by reading their title, metadata, visible text, and structure.
+8. Distinguish global facts from project-local assumptions.
+9. Surface stale, contradictory, weakly sourced, or translation-sensitive knowledge.
+10. If the answer creates durable new knowledge, mention it as an ingest candidate in the knowledge locale.
 
 Current user instructions override stale stored knowledge.
 
@@ -261,6 +280,7 @@ Detect:
 - global pages containing project-local details
 - project lessons that could become global principles
 - orphan pages or orphan HTML artifacts
+- source summaries missing raw source links, source metadata, related knowledge links, or index entries
 - broken Markdown links or HTML links
 - pages missing from `index.md`
 - large pages that should be split
@@ -329,5 +349,3 @@ Use `templates/` for initial pages:
 - `config.md`
 
 Use `SCHEMA.md` for the full directory and artifact schema when initializing or auditing a knowledge base.
-
-
