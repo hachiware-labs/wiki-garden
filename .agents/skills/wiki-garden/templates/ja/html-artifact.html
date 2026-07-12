@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ja" data-scope="project">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>知識成果物の名前</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --text: #1f2933;
+      --muted: #52606d;
+      --line: #d9e2ec;
+      --surface: #f8fafc;
+      --accent: #0f766e;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: white;
+      line-height: 1.7;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+
+    header {
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+    }
+
+    .meta {
+      color: var(--muted);
+    }
+
+    .diagram {
+      display: grid;
+      gap: 12px;
+      margin: 24px 0;
+    }
+
+    .node {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent);
+      padding: 14px 16px;
+      background: var(--surface);
+    }
+
+    @media print {
+      .node {
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>知識成果物の名前</h1>
+      <p class="meta">対象: プロジェクト | 更新日: YYYY-MM-DD</p>
+      <p>この成果物が何を説明するかを短く書きます。</p>
+    </header>
+
+    <section aria-labelledby="overview-heading">
+      <h2 id="overview-heading">概要</h2>
+      <p>何を説明し、どのように読めばよいかを書きます。</p>
+    </section>
+
+    <section class="diagram" aria-labelledby="diagram-heading">
+      <h2 id="diagram-heading">構造</h2>
+      <div class="node">
+        <strong>要素または手順</strong>
+        <p>役割、関係、状態の移り変わりを説明します。</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="related-heading">
+      <h2 id="related-heading">関連知識</h2>
+      <ul>
+        <li><a href="index.md">最寄りの索引</a></li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="sources-heading">
+      <h2 id="sources-heading">情報源</h2>
+      <ul>
+        <li>利用できる場合は資料への参照を追加します。</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

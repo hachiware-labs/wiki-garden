@@ -1,291 +1,140 @@
 # Wiki Garden 要件定義
 
-**Wiki Garden** は、Andrej Karpathy の LLM Wiki パターンにインスパイアされた、Markdown 知識ベース運用スキルである。
-
-目的は、会話・資料・成果物から得た知見を、単なるチャット履歴やメモとして残すのではなく、**全体知識** と **プロジェクト固有知識** に分類し、Markdown Wiki として継続的に更新・洗練することである。
-
-```text
-raw sources / current work
-  ↓
-ingest
-  ↓
-source summaries
-  ↓
-global knowledge / project-local knowledge
-  ↓
-query
-  ↓
-lint / refine
-  ↓
-継続的に育つ Markdown 知識ベース
-```
-
----
-
 ## 1. 目的
 
-Wiki Garden は、Karpathy の LLM Wiki 原則を、実運用可能な Markdown 知識ベース管理スキルとして具象化する。
+Wiki Gardenは、Andrej KarpathyのLLM Wikiを土台に、知識を記録するだけでなく、時間をかけて育てるための機能である。
 
-この Skill は、以下を実現する。
+資料、作業、問い、ユーザーとの対話から得た内容を、会話録や一時的なメモではなく、後から読めて、確かめられ、再利用できる正規知識へ変える。
 
-- raw source や現在作業中の会話から、再利用可能な知見を抽出する
-- raw source を指定された knowledge root 配下の `raw/` に保ち、必要に応じて参照・保存する
-- 1つの外部ソースにつき 1つの source summary ページを作る
-- 知見を **global knowledge** と **project-local knowledge** に分類する
-- 知見を session summary として保存せず、正規の Markdown ページへ反映する
-- 既存知識を query し、作業に必要な文脈を取得する
-- 知識ベースの矛盾・古さ・根拠不足を lint する
-- 知識ベースを定期的に refine する
-
----
-
-## 2. 基本思想
-
-### 2.1 Karpathy LLM Wiki 準拠
-
-Karpathy の基本操作である、
+Karpathyの三操作を引き継ぐ。
 
 ```text
-ingest
 query
+ingest
 lint
 ```
 
-を中核にする。
-
-本 Skill では、これに加えて、知識の継続的な整理・昇格・統合を行う操作として、
+Wiki Gardenは、そこへ二操作と定期的なタネ探しを加える。
 
 ```text
-refine
+nurture
+what's up
 ```
-
-を追加する。
-
-### 2.2 セッションは知識ではない
-
-本 Skill は、CLI やエージェントとの対話セッションを原則として永続保存しない。
 
 ```text
-セッション = 一時的な入力
-知識       = global / project-local の正規ページ
+query / ingest / lint
+  → 定期的に対話のタネを見つける
+  → what's upで一件を提示する
+  → nurtureで知識を育てる
+  → 長く役立つ内容をingestする
 ```
 
-セッションから価値ある知見が生まれた場合は、セッション要約として保存するのではなく、正規の知識ページへ反映する。
+## 2. 基本原則
 
-### 2.3 知識にはスコープがある
+### 2.1 原資料と正規知識を分ける
 
-知識は最低限、次の2層に分類する。
+原資料は書き換えない。記事、論文、仕様書、画像、データなどを、後から検証できる根拠として保持する。
+
+LLMが維持する正規知識はMarkdownを基本形式とし、必要に応じて静的HTMLを使う。
+
+### 2.2 会話は知識ではない
+
+会話そのものは原則として保存しない。
 
 ```text
-global knowledge
-  複数プロジェクトで再利用できる概念、原則、方法論、比較、設計思想。
-
-project-local knowledge
-  特定プロジェクトだけで有効な背景、判断、制約、用語、成果物、未解決問い。
+会話 = 一時的な入力
+知識 = 正規ページへ蒸留した、長く役立つ内容
 ```
 
-プロジェクト固有の判断を global knowledge に混ぜない。  
-一般化できるものだけを global knowledge に昇格する。
+対話から取り込むのは、判断、制約、教訓、用語、方法、未解決の問いなどである。
 
-### 2.4 Markdown-first, HTML-allowed
+### 2.3 知識の適用範囲を守る
 
-本 Skill は Markdown を標準形式とするが、Markdown だけに限定しない。
+知識を二つに分ける。
 
-構造的な理解が重要な知識、たとえば図説、フロー、依存関係、アーキテクチャマップ、意思決定ツリー、時系列、比較マトリクス、コンセプトマップ、軽量なインタラクティブ説明は、静的 HTML として保存してよい。
+- 全体知識: 複数のプロジェクトで再利用できる概念、原則、方法、比較
+- プロジェクト固有知識: 特定のプロジェクトだけで成り立つ背景、判断、制約、用語、教訓
 
-HTML は一時的なプレビューではなく、Markdown と並ぶ正規の知識ページとして扱う。
+プロジェクト固有の判断を、根拠なく全体知識へ昇格させない。
 
-ただし、`html/` のような専用バケットを標準にはしない。`concepts/`、`methods/`、`comparisons/`、`decisions/` などの既存フォルダがすでに知識構造を表しているため、HTML は関連する Markdown と同じ意味的フォルダに並べて置く。
+### 2.4 人間を中心に置く
 
-例:
+Wiki Gardenは、問題に気づき、話題を準備し、調査し、提案できる。ただし、どのタネを育てるか、意味を変える更新を行うかは、人間と一緒に決める。
 
-```text
-global/
-  concepts/
-    llm-wiki.md
-    llm-wiki-map.html
-  methods/
-    knowledge-refinement.md
-    knowledge-refinement-flow.html
+## 3. 日本語の品質
 
-projects/
-  wiki-garden/
-    decisions/
-      0001-core-operations.md
-      0001-core-operations-map.html
-    repository-structure.html
-```
+`knowledge_locale`が`ja`または`ja-*`の場合、正規知識、回答、点検結果、知識更新案、対話のタネ、HTMLの表示文を自然な日本語で書く。
 
-### 2.5 Locale-centered knowledge
+英語を残してよいのは次に限る。
 
-Skill 本体の指示言語と、知識ベースの正規言語は分けて扱う。
+- 固有名
+- 製品名
+- `query`などの操作識別子
+- コード上の識別子
+- API名
+- ファイル名とパス
+- 原資料の題名
+- 精度のために原語が必要な専門用語
 
-Wiki Garden は `knowledge_locale` を持つ。正規の Markdown / HTML 知識ページ、index、log、decision、lesson、open question、query 回答、lint レポート、knowledge patch は、原則として `knowledge_locale` の言語で作成する。
+通常の説明語は日本語にする。
 
-外国語ソースを ingest する場合は、原資料を原文のまま保持または参照し、再利用可能な知識だけを `knowledge_locale` に蒸留して取り込む。
+| 避ける表記 | 推奨する表記 |
+| --- | --- |
+| source | 資料、情報源 |
+| source summary | 資料要約 |
+| canonical knowledge | 正規知識 |
+| global knowledge | 全体知識 |
+| project-local knowledge | プロジェクト固有知識 |
+| open question | 未解決の問い |
+| scope | 対象範囲 |
+| knowledge locale / locale | 知識の記述言語 |
+| Conversation Seed / Seed | 対話のタネ、タネ |
+| Defects | 問題 |
+| Growth Opportunities | 成長の機会 |
+| document / ドキュメント | 文書 |
+| entry / エントリ | 項目 |
 
-例:
+操作名は識別子としてバッククォート内に残し、意味を日本語で説明する。「ナーチャリング」のような不要なカタカナ語を作らない。
 
-```yaml
-knowledge_locale: ja-JP
-source_language_policy: preserve-original
-ingest_language_policy: distill-to-knowledge-locale
-```
+英語の名詞を日本語の助詞でつないだ直訳調を避け、日本語の動詞を中心に文を組み立てる。
 
-用語ルール:
+利用者へ見せる依頼例は、内部的な呼び出し方や、操作名を日本語の動詞のように使った文にしない。操作名を説明として示すことはできるが、依頼は「この資料を取り込んで」のような自然な日本語にする。「この資料を`ingest`して」とは書かない。
 
-- 固有名詞、API 名、コード識別子、ファイルパス、コマンドは原則として翻訳しない
-- 重要な専門用語は初出で原語を併記する
-- 訳語が不安定なものは `glossary.md` または `open-questions.md` に残す
-- 直訳よりも、知識として再利用しやすいロケール言語の説明を優先する
+原語の併記が必要な場合は初出だけにし、その後は日本語で書く。
 
-例:
+### 3.1 人が読む文書の品質
 
-```markdown
-# 検索拡張生成（Retrieval-Augmented Generation, RAG）
-```
+README、チュートリアル、手引き、解説ページは、機能や内部規則を並べた生成物ではなく、読者のために編集した文書とする。日本語だけでなく、すべての言語に適用する。
 
----
+- 書く前に、想定する読者、その文書が答える問い、読後に取れる行動を決める。
+- 文書の役割を混ぜない。READMEは導入を判断し、最初の成功へ進むための文書とする。チュートリアルは一つの具体例を最初から最後まで進める実習とする。網羅的な規約は参照文書へ分ける。
+- 内部構造より先に、読者が得られる結果を示す。
+- 最短の手順、選択肢と境界、詳しい参照先の順に書く。同じ説明やコマンド一覧を繰り返さない。
+- 初めて出る言葉は、使い続ける前に意味を説明する。抽象的な列挙より具体例を優先する。
+- コマンド例は、その文脈で実行できるものにし、実行後に何が見えるかを説明する。
+- 各言語を独立した文章として編集する。事実はそろえるが、逐語訳や同じ段落構成を強制しない。
+- 読者が作業するために不要な内部の項目名や実装詳細は本文へ出さない。
+- 公開前に、見出しだけを読んだときの流れ、重複、リンク、コマンドを確認する。冒頭だけで価値が分かり、最初の行動へ進めることを確かめる。
+- 文法的に正しくても、無機質な文章、項目を並べただけの文章、翻訳調の文章、読む理由が分からない文章は書き直す。
 
-## 3. 対象ユーザー
+日本語では前節の規則も適用し、普通の日本語がある箇所を英語やカタカナで済ませない。英語では英語として自然で直接的な文にし、名詞を重ねた官僚的な表現を避ける。
 
-主な対象は以下。
+## 4. 知識の保存先
 
-- Codex / Claude Code / Cursor / OpenCode などで開発・調査を行うユーザー
-- Markdown ベースで知識を育てたいユーザー
-- Obsidian / VS Code / GitHub で知識ベースを扱いたいユーザー
-- プロジェクトごとの暗黙知を残したい開発者
-- 複数 AI エージェント環境で共通の知識運用をしたいユーザー
+知識の保存先は次の順に決める。
 
----
+1. 現在の依頼で明示されたパス
+2. リポジトリ直下の`wiki-garden.config.md`
+3. 互換用の旧設定ファイル
+4. `WIKI_GARDEN_CONFIG`が指す利用者共通設定
+5. `~/wiki-garden.config.md`
+6. リポジトリの指示や既存規約
+7. 既存の知識フォルダー
+8. `knowledge/`
 
-## 4. 想定利用環境
+新しく作る場合は、隠しフォルダーではない`knowledge/`を標準とする。
 
-### 4.1 配布形態
-
-GitHub リポジトリとして公開する。
-
-例:
-
-```text
-github.com/hachiware-labs/wiki-garden
-```
-
-Vercel Labs の `npx skills` で取り込める構造にする。
-
-例:
-
-```bash
-npx skills add hachiware-labs/wiki-garden
-npx skills add hachiware-labs/wiki-garden -a claude-code -a codex
-npx skills add https://github.com/hachiware-labs/wiki-garden
-```
-
-### 4.2 対象エージェント
-
-必須対応:
-
-- Claude Code
-- OpenAI Codex
-
-できれば対応:
-
-- Cursor
-- OpenCode
-- Gemini CLI
-- GitHub Copilot agent 系
-
-MVP では **Agent Skills open standard / SKILL.md** に準拠した instruction-only Skill として実装し、各ツール固有の拡張は最小限にする。
-
----
-
-## 5. リポジトリ構成要件
-
-推奨構成:
-
-```text
-wiki-garden/
-  README.md
-  LICENSE
-  AGENTS.md
-  skills/
-    wiki-garden/
-      SKILL.md
-      SCHEMA.md
-      examples/
-        basic-wiki/
-        project-wiki/
-      templates/
-        global-index.md
-        project-index.md
-        project-context.md
-        decision.md
-        log.md
-  .agents/
-    skills/
-      wiki-garden/
-        SKILL.md
-        SCHEMA.md
-```
-
-ただし、配布の単純さを優先するなら、まずは次でもよい。
-
-```text
-wiki-garden/
-  README.md
-  LICENSE
-  .agents/
-    skills/
-      wiki-garden/
-        SKILL.md
-        SCHEMA.md
-        templates/
-```
-
-Codex 互換性を考えると、`.agents/skills/wiki-garden/SKILL.md` は置いておく価値が高い。
-
----
-
-## 6. Skill メタデータ要件
-
-`SKILL.md` は次のような frontmatter を持つ。
-
-```yaml
----
-name: wiki-garden
-description: Maintain a locale-centered, Karpathy-inspired Markdown and static HTML knowledge base. Use for configuring a shared or project-specific knowledge root or knowledge locale, ingesting sources, querying global or project-local knowledge, linting knowledge quality, refining canonical wiki pages, and creating diagram-heavy HTML knowledge pages.
----
-```
-
-説明文は、Codex や Claude Code が自動発火を判断しやすいように、用途を前半に明示する。
-
----
-
-## 7. 知識ベース構造要件
-
-Wiki Garden が前提とする知識ベースは、設定可能な knowledge root 配下に置く。
-
-knowledge root の解決順は以下とする。
-
-1. ユーザーが明示したパス
-2. リポジトリルートの `wiki-garden.config.md`
-3. 互換用の `knowledge-garden.config.md` または `knowledge-gardener.config.md`
-4. 環境変数 `WIKI_GARDEN_CONFIG` が指すユーザー共通設定
-5. 互換用の `KNOWLEDGE_GARDENER_CONFIG` が指すユーザー共通設定
-6. `~/wiki-garden.config.md`
-7. 互換用の `~/knowledge-garden.config.md` または `~/knowledge-gardener.config.md`
-8. `AGENTS.md` などのプロジェクト指示や既存規約で指定されたパス
-9. 既存の知識フォルダ
-10. デフォルト値 `knowledge/`
-
-デフォルトでは `.knowledge/` のようなドット付き隠しフォルダを作らない。Obsidian などのツールで見えにくくなる可能性があるためである。  
-ただし、ユーザーが明示した場合や既存リポジトリが採用している場合は、`.knowledge/` もサポートする。
-
-グローバルにインストールされた Skill は永続的な内部状態を持たないため、プロジェクトをまたいで使う共通知識 root はユーザー共通設定に保存する。標準の保存先は `~/wiki-garden.config.md` とする。`WIKI_GARDEN_CONFIG` が設定されている場合は、そのパスを優先する。
-
-旧名称からの移行互換として、`knowledge-garden.config.md`、`knowledge-gardener.config.md`、`~/knowledge-garden.config.md`、`~/knowledge-gardener.config.md`、`KNOWLEDGE_GARDENER_CONFIG` は読み取り対象に含める。ただし新規作成は `wiki-garden.config.md` と `WIKI_GARDEN_CONFIG` を使う。
-
-例:
+設定例:
 
 ```markdown
 ---
@@ -296,29 +145,13 @@ source_language_policy: preserve-original
 ingest_language_policy: distill-to-knowledge-locale
 ---
 
-# Wiki Garden Config
+# Wiki Garden設定
 
-Use `~/WikiGarden/` as the shared Wiki Garden root.
-
-Use `ja-JP` as the canonical knowledge locale.
+複数の作業で共有する知識の保存先として`~/WikiGarden/`を使います。
+正規知識は日本語で記述します。
 ```
 
-プロジェクト単位で上書きしたい場合のみ、リポジトリルートの `wiki-garden.config.md` を使う。
-
-```markdown
----
-knowledge_root: docs/wiki
-scope: project
-knowledge_locale: ja-JP
----
-
-# Wiki Garden Config
-
-This project uses `docs/wiki/` as its Wiki Garden root.
-This project uses `ja-JP` as its canonical knowledge locale.
-```
-
-標準構造は以下。
+## 5. 推奨する構成
 
 ```text
 knowledge/
@@ -338,698 +171,337 @@ knowledge/
     index.md
     log.md
     concepts/
-      *.md
-      *.html
     principles/
-      *.md
-      *.html
     methods/
-      *.md
-      *.html
     comparisons/
-      *.md
-      *.html
     glossary.md
     open-questions.md
-
   projects/
-    <project-name>/
+    <プロジェクト名>/
       PROJECT.md
       index.md
       log.md
       context.md
       glossary.md
       decisions/
-        *.md
-        *.html
       lessons.md
       open-questions.md
       artifacts.md
-      *.html
-
 ```
 
-Markdown と HTML は、同じ知識カテゴリ内に並べてよい。HTML は「別種の格納場所」ではなく、「同じ知識構造に属する別表現」として扱う。
+フォルダー名と設定項目は互換性のため英語の識別子を使う。ページの見出しと本文は設定された言語で書く。
 
-### 7.1 global
+## 6. `query`
 
-全体に再利用可能な知識を置く。
+現在の知識から問いに答える、読み取り専用の操作である。
 
-```text
-concepts/
-  概念定義
+1. 知識の保存先と記述言語を決める
+2. プロジェクトが指定されていれば、プロジェクト固有知識を先に読む
+3. 全体知識と資料要約の索引を読む
+4. 必要なページだけを読む
+5. 正規知識とプロジェクト固有の前提を区別する
+6. 古い、矛盾している、根拠が弱い内容を明示する
+7. 設定言語で答える
 
-principles/
-  一般原則
+`query`は外部検索やファイル変更を行わない。知識の穴を見つけた場合は、次の行動を一つだけ提案できる。
 
-methods/
-  手法・運用方法
+## 7. `ingest`
 
-comparisons/
-  比較・対比
+指定された資料または対話中の知見を正規知識へ取り込む。
 
-glossary.md
-  全体用語集
+外部資料の場合:
 
-open-questions.md
-  全体の未解決問い
-```
+1. 原資料を`raw/sources/`へ保存または参照する
+2. 既存の原資料を書き換えない
+3. 一資料ごとの要約を`sources/`へ作る
+4. 題名、URL、取得日、資料の種類を保持する
+5. 主な主張、根拠、限界、関連知識、未解決の問いを整理する
+6. 関連する正規ページへ横断的な理解を統合する
+7. 索引と履歴を更新する
 
-### 7.2 projects
+対話から得た知識の場合:
 
-プロジェクト固有の知見を置く。
+1. 長く役立つ判断、制約、教訓、方法、用語、問いだけを取り出す
+2. 会話録や一般的な会話要約を作らない
+3. 適切な正規ページへ直接統合する
+4. その場限りの情報は捨てる
 
-```text
-PROJECT.md
-  プロジェクトの目的、非目標、前提、境界
+大量の資料を無差別に取り込まない。利用者が確認できる小さな資料集合を優先する。
 
-context.md
-  現在の背景、設計文脈、制約
+## 8. `lint`
 
-decisions/
-  意思決定記録
+知識を変更せず、問題と成長の機会を報告する。
 
-lessons.md
-  実際に分かったこと、失敗、注意点
-
-open-questions.md
-  プロジェクト固有の未解決問い
-
-artifacts.md
-  成果物の目録
-
-log.md
-  知識ベースへの変更履歴
-```
-
-### 7.3 raw
-
-保存対象の原資料を置く。
-
-```text
-raw/sources/
-  論文、記事、仕様書、資料、メモ、成果物など
-  papers/
-  articles/
-  web/
-  docs/
-```
-
-`raw/` は、選択された knowledge root の直下で管理する。ユーザーが指定したフォルダを knowledge root とする場合、そのフォルダ内に `raw/` を置く。raw source は一次資料であり、ingest / query / lint / refine で勝手に書き換えない。
-
-Web ページを raw source として扱う場合は、少なくとも URL、取得日、タイトル、保存形式を残す。通常の記事は本文抽出 Markdown を優先し、レイアウトや後日の厳密検証が重要な場合だけ HTML snapshot を併置する。
-
-CLI 対話セッションの生ログは、MVP では標準保存しない。  
-必要な場合のみ、将来オプションとして `raw/sessions/` を検討する。
-
-### 7.4 source summaries
-
-外部ソースを ingest した結果として、1ソース1ページの summary を置く。
-
-```text
-sources/
-  index.md
-  papers/
-    *.md
-  articles/
-    *.md
-  web/
-    *.md
-  docs/
-    *.md
-```
-
-source summary は raw source と横断知識ページの中間層である。各ページは raw source への参照、要約、主要 claim、根拠または詳細、限界、関連する concept / method / comparison / decision / project context、未解決問いを含む。
-
-source summary の推奨 frontmatter:
-
-```yaml
----
-type: source-summary
-source_type: paper
-scope: global
-source_path:
-source_url:
-captured_at:
-title:
-authors:
-year:
----
-```
-
----
-
-## 8. コア操作要件
-
-外部に見せる操作は4つにする。
-
-```text
-ingest
-query
-lint
-refine
-```
-
-加えて、グローバルインストールされた Skill が共通 knowledge root を保持するためのセットアップ操作として、`set_knowledge_path` をサポートする。`set_knowledge_path` は知識操作ではなく設定操作であり、デフォルトではユーザー共通設定 `~/wiki-garden.config.md` を作成または更新する。
-
-エイリアス:
-
-```text
-set_knowledge_path
-get_knowledge_path
-set_path
-set-root
-configure root
-```
-
-さらに、knowledge locale を保持するための設定操作として、`set_knowledge_locale` をサポートする。
-また、現在有効な設定を確認するため、`get_knowledge_path` と `get_knowledge_locale` をサポートする。
-
-例:
-
-```text
-set_knowledge_locale ja-JP
-get_knowledge_locale
-set_knowledge_locale --project en-US
-```
-
-制約:
-
-- Skill 自体にグローバル状態を持たせない
-- 共通設定はユーザー共通設定ファイルに保存する
-- プロジェクト固有の上書きは `set_knowledge_path --project <path>` または `set_project_knowledge_path <path>` でリポジトリ内に保存する
-- `get_knowledge_path` と `get_knowledge_locale` は表示のみで、ファイルを作成・変更しない
-- 既存知識の移動は自動で行わず、必要なら knowledge patch として提案する
-
----
-
-### 8.1 ingest
-
-#### 目的
-
-指定ファイル、raw source、または現在セッション中に生まれた有用な知見を取り込み、正規の知識ページへ反映する。
-
-#### 入力
-
-- file path 任意
-- project name 任意
-- current session context
-
-#### 動作
-
-1. knowledge root と knowledge locale を解決する
-2. 外部ソースを ingest する場合、その source が `<knowledge-root>/raw/sources/` に属するものとして扱う
-3. 入力ファイルが knowledge root の外にあり、ユーザーが raw 保存を求めている場合は、raw source として `raw/sources/` に保存または capture する
-4. 既存の raw source は書き換えない
-5. Web source の場合は URL、取得日、タイトル、保存形式を raw metadata として保持する
-6. 入力がファイルなら内容を読む
-7. 入力が明示されない場合は現在セッションから有用な知見を抽出する
-8. 原資料や citation は原文のまま保持する
-9. 外部ソースの場合、`sources/<type>/` に 1ソース1ページの summary を作成または更新する
-10. 再利用可能な知識を knowledge locale に蒸留する
-11. 知見候補を分類する
-   - source summary
-   - global knowledge
-   - project-local context
-   - decision
-   - lesson
-   - open question
-   - artifact reference
-   - HTML knowledge artifact candidate
-   - glossary term
-   - transient / discard
-12. 既存ページを検索する
-13. 関連する concept / method / comparison / project ページを読み直す
-14. 新しい source summary から、既存知識との共通点、対立点、補完関係、分類の更新、未解決問いを抽出する
-15. 既存ページへ knowledge locale で統合する
-16. 必要な場合だけ新規ページを作る
-17. 構造的な図説が有効な場合は、関連 Markdown と同じ意味的フォルダに HTML 知識ページを knowledge locale で作る
-18. `index.md` を更新する
-19. `log.md` に変更履歴を書く
-
-#### 制約
-
-- セッション要約を保存しない
-- raw source を勝手に書き換えない
-- 外部ソースの ingest では、原則として raw source と source summary と横断知識を分ける
-- source summary は raw source を代替するものではなく、raw source へ戻れる索引として扱う
-- 出典や根拠がある場合は残す
-- 不確実なものは断定せず open question にする
-- HTML を使う場合も、`index.md`、`log.md`、関連 Markdown から辿れるようにする
-- 外国語ソースは原文を保持し、正規知識は knowledge locale で記述する
-- ユーザーが理解できない速度で wiki が膨張しないよう、source selection は curated set を優先する
-
----
-
-### 8.2 query
-
-#### 目的
-
-現在の問いに関連する知識を、global / project-local から取得して回答する。
-
-#### 入力
-
-- query 任意
-- project name 任意
-
-#### 動作
-
-1. knowledge root と knowledge locale を解決する
-2. project name がある場合、まず project-local knowledge を読む
-3. global knowledge から関連概念・方法・比較を探す
-4. `index.md` を優先して読み、必要に応じて本文へ掘る
-5. 関連 HTML がある場合は、タイトル、メタ情報、本文、構造、関連リンクを読む
-6. 回答に必要な知識だけを抽出する
-7. 回答は、ユーザーが別言語を明示しない限り knowledge locale で行う
-8. 矛盾、不確実性、古い可能性、翻訳依存の注意点があれば明示する
-9. 回答中に新しい durable knowledge が生まれた場合、ingest 候補として knowledge locale で提示する
-
-#### 制約
-
-- 古い知識と現在の明示指示が矛盾する場合、現在の指示を優先する
-- project-local な情報を global な一般論として扱わない
-- 出典不明の断定を避ける
-
----
-
-### 8.3 lint
-
-#### 目的
-
-知識ベースの異常、根拠不足、古さ、翻訳ゆれ、構造上の問題を検出する。
-
-#### 検出対象
+検出する問題:
 
 - 矛盾
 - 根拠不足
 - 古くなった主張
-- 再確認が必要な claim
-- 翻訳ゆれ
-- 原語併記が必要な用語
-- scope 違い
-- project-local 知識の global 混入
-- global 化できそうな project-local 知識
+- 翻訳の揺れ
+- 適用範囲の混入
 - 孤立ページ
 - リンク切れ
-- `index.md` 未登録ページ
-- 重複ページ
+- 索引漏れ
+- 重複
 - 大きすぎるページ
-- 未分類の inbox 項目
-- 孤立した HTML 知識ページ
-- タイトル、スコープ、更新日、関連 Markdown、出典、アクセシビリティ情報が不足した HTML
+- 資料への参照不足
 
-#### 出力
+検出する成長の機会:
 
-- 問題一覧
-- 影響範囲
-- 修正提案
-- refine で直せるもの / 人間判断が必要なものの区別
-- knowledge locale での説明
+- 全体で使える原則になりそうなプロジェクトの教訓
+- ページやプロジェクトをまたぐ接続候補
+- ユーザーの意図や経験が必要な問い
+- 外部調査で前進できる明確な問い
 
-#### 制約
+日本語の点検結果は、「問題」「成長の機会」「影響」「対応案」「人間の判断が必要」のような見出しを使う。
 
-- lint は原則として検出のみ
-- 自動修正はしない
-- 修正が必要な場合は refine の対象として提案する
-- 外国語ソースに関する問題は、説明を knowledge locale で行い、必要最小限の原文を併記する
+`lint`は自動修正しない。各項目を、`nurture`で扱えるもの、資料の追加が必要なもの、人間の判断が必要なものに分ける。
 
----
+## 9. `nurture`
 
-### 8.4 refine
+選んだテーマを、より明確で、根拠が強く、再利用しやすい知識へ育てる。
 
-#### 目的
+1. 対象のテーマ、対話のタネ、点検結果、または利用者の目的を決める
+2. 関連する正規ページと資料を読む
+3. 対象を絞って問題と知識の穴を調べる
+4. Wiki内の知識、ユーザーの知識、外部の知識という三つの観点を検討する
+5. ユーザーにしか分からない意図、経験、制約を尋ねる
+6. 必要な場合だけ外部調査を行う
+7. 外部資料を採用する場合は`ingest`の規約に従う
+8. 深い調査でも、正規知識への変更は小さく確認しやすくする
+9. 索引と履歴を更新する
 
-知識ベースを洗練する。
+可能な変更:
 
-#### 動作
+- 重複の統合
+- 大きなページの分割
+- 不確かな主張を未解決の問いへ戻す
+- 用語の統一
+- プロジェクト固有知識と全体知識の整理
+- 教訓から原則を導く
+- 関連ページの接続
+- 競合する見解の整理
+- 根拠や反証の追加
+- 静的HTMLによる構造説明
 
-- 重複ページを統合する
-- 長すぎるページを分割する
-- 曖昧な断定を open question に降格する
-- knowledge locale に用語を統一する
-- 必要な原語併記を glossary に追加する
-- raw source を変更せず翻訳ゆれを修正する
-- project-local lessons から global principles 候補を抽出する
-- global に混入した project-local 情報を移動する
-- backlinks を追加する
-- `index.md` を整理する
-- `log.md` を整える
-- 古い情報を stale として明示する
-- Markdown では読みにくい構造説明を、同じ意味的フォルダの HTML 知識ページとして作成する
-- HTML 知識ページを関連 Markdown と相互リンクする
+意味を変える大きな更新の前には、知識更新案を提示する。
 
-#### 制約
+以前の`refine`という指示は、後方互換のため、構造整理に範囲を絞った`nurture`として扱う。
 
-- 大きな構造変更は knowledge patch として提示してから行う
-- 原資料を変更しない
-- 判断が必要な昇格・統合はユーザー確認を推奨する
+## 10. `what's up`
 
----
+Wikiが準備していた対話のタネを一件提示する。
 
-## 9. knowledge patch 要件
+次の言い方を認識する。
 
-大きな変更を行う前に、Skill は **knowledge patch** を提示できること。
+- 何かある？
+- 最近どう？
+- 私に聞きたいことある？
+- 調べたいことある？
 
-形式例:
+提示前に、タネに含まれる重要な主張を関連ページと照合する。
 
-```markdown
-# Knowledge Patch
+複数の判断やプロジェクトで繰り返していると主張する場合は、それぞれの事例へのリンクを必要とする。同じ主張を繰り返すページは、別の根拠として数えない。
 
-## Global updates
+根拠が不足している場合は、別のタネを選ぶか、確認できた範囲を示して「調べたい仮説」として提示する。もっともらしさだけで不足を補わない。
 
-- Update `global/methods/llm-wiki-maintenance.md`
-  - Add principle: sessions are transient inputs.
-  - Add operation: refine.
+調査済みのタネでは、資料が直接支持する内容と、Wikiがそこから考えたことを分ける。
 
-## Project-local updates
+ユーザーは、話を続ける、保留する、捨てる、別の種類を求める、次のタネを求める、のいずれかを選べる。
 
-- Update `projects/wiki-garden/context.md`
-  - Add scope rule: project-local decisions must not be generalized automatically.
+## 11. 対話のタネ
 
-## Decisions
+別の決まりがなければ、全体またはプロジェクトの`open-questions.md`に`## 対話のタネ`という節を置く。
 
-- Create `projects/wiki-garden/decisions/0001-core-operations.md`
-
-## Open questions
-
-- Should CLI session logs ever be saved as optional audit material?
-
-## Discarded as transient
-
-- Temporary wording preferences from this conversation.
-```
-
-MVP では、実ファイルとして `patches/` に保存しなくてもよい。  
-エージェントが編集前に提示する差分案として扱う。
-
----
-
-## 10. 初期テンプレート要件
-
-Skill にはテンプレートを含める。
-
-### 10.1 global/index.md
+日本語の形式:
 
 ```markdown
-# Global Knowledge Index
+### 話題の名前
 
-## Concepts
-
-## Principles
-
-## Methods
-
-## Comparisons
-
-## Glossary
-
-## Open Questions
+- 種類: 質問 | 観察 | 考えのずれ | 接続 | 提案 | 調査 | 再検討
+- 状態: 準備済み | 調査待ち | 調査済み | 保留
+- 今扱う理由: なぜ今この話題なのか
+- 関連知識: 関連ページへのリンク
+- 対話のきっかけ: ユーザーと何を話したいか
+- 調査メモ: 事前調査した場合の問い、資料、調査日
 ```
 
-### 10.2 project/PROJECT.md
+定期実行では、最近の履歴、変更されたページ、未解決の問い、資料要約、`lint`の結果を確認する。
 
-```markdown
-# Project
+一つの対象範囲につき、通常は3〜7件だけを保持する。重複、弱いタネ、古いタネ、解決済みのタネを取り除く。
 
-## Purpose
+対話のタネは正規の主張ではない。会話録も保存しない。
 
-## Non-goals
+## 12. タネの事前調査
 
-## Background
+次の条件を満たす場合、タネを用意する段階で調査できる。
 
-## Constraints
+- 問いが具体的である
+- 対象範囲を限定できる
+- 影響する知識ページが分かっている
+- 外部の根拠で前進できる
 
-## Current focus
+専用のDeep Research機能が利用できる場合は優先する。たとえば`deep-research`や`hachi-deep-research`である。利用できない場合は、実行環境で使える調査手段を使う。
+
+別の指定がなければ、次を標準とする。
+
+- 一度に一つの明確な問い
+- 最大15分
+- 通常2〜3件の信頼できる資料
+- 十分なタネができたら早く終了
+
+時間内に終わらない場合は、未確認の途中結果を保存しない。問いと次の手順を「調査待ち」のタネとして残す。
+
+調査済みのタネには、問い、資料名、URL、公開日または取得日、調査日を残す。調査結果を自動的に正規知識へ昇格させない。
+
+## 13. Markdownと静的HTML
+
+文章、判断、教訓、索引、未解決の問いにはMarkdownを使う。
+
+構造や操作そのものが知識であり、文章だけでは理解しにくい場合は静的HTMLを使う。
+
+- 構成図
+- 依存関係図
+- 判断の分岐図
+- 概念の関係図
+- 時系列
+- 比較表
+- 操作できる説明図
+
+HTMLは関連するMarkdownと同じ意味のフォルダーに置く。表題、目的、適用範囲、更新日、関連知識、情報源、文字による代替説明を含める。
+
+## 14. 初期ページの雛形
+
+英語用の雛形は`templates/`に置く。日本語の知識には`templates/ja/`を優先する。
+
+雛形の構造は再利用できるが、見出しと本文は必ず設定言語に合わせる。英語用の見出しを日本語知識へそのまま写さない。
+
+## 15. 初期設定と診断
+
+通常の利用者が複数の設定操作を手で組み立てなくて済むよう、次の補助操作を持つ。
+
+### `setup`
+
+初回利用時に推奨する入口である。`init`、「初期設定」「セットアップ」も同じ意味として扱う。
+
+```text
+setup --project [保存先] --locale <言語>
+setup --shared <保存先> --locale <言語>
+setup
 ```
 
-### 10.3 project/context.md
+`--project`ではリポジトリ直下へ設定を書き、保存先を省略した場合は`knowledge/`を使う。`--shared`では利用者共通設定を書き、標準候補を`~/WikiGarden`とする。
 
-```markdown
-# Project Context
+記述言語の指定がなければ既存設定を優先し、既存設定もなければ会話の言語から判断する。日本語の会話では`ja-JP`を標準とする。
 
-## Current understanding
+選んだ保存先、初期フォルダー、全体知識の索引、履歴、用語集、未解決の問いを作る。プロジェクト用設定では、プロジェクトの初期ページも作る。既存ページは上書きしない。
 
-## Architecture / design context
+日本語では`templates/ja/`を使い、見出しと説明文を自然な日本語で作る。
 
-## Important constraints
+完了時に、設定ファイル、知識の保存先、記述言語、作成したファイル、残した既存ファイル、次に試す操作を報告する。
 
-## Local terminology
+日本語の完了報告では、表題を「初期設定完了」とし、「設定」「作成したもの」「残した既存ファイル」「次にできること」を使う。Setup complete、Summary、template、scope、localeなどの通常英語を使わず、「雛形」「適用範囲」「記述言語」と書く。
 
-## Notes
+既存の知識を自動的に移動しない。
+
+### `doctor`
+
+設定と初期構造を読み取り専用で診断する。「設定確認」「診断」も同じ意味として扱う。
+
+確認する内容:
+
+- どの設定ファイルと優先順位で保存先・記述言語が決まったか
+- 保存先が存在し、読み取れるか
+- 初期フォルダーと索引が揃っているか
+- 新旧の設定が競合していないか
+- 索引が欠けている、または重複していないか
+- 日本語の知識で日本語見出しと日本語のタネ項目が使われているか
+- 修復に使う操作
+
+`doctor`はファイルを作成、変更、移動、削除しない。
+
+日本語の診断では、表題を「設定診断結果」とし、「設定元」「知識の保存先」「記述言語」「初期構造」「日本語品質」「総合判定」を使う。通常語としてのDoctor、レガシー、インデックス、ログ、スキーマ、カテゴリは使わない。
+
+表示される見出しと項目名に不要な英字がないかを確認する。Markdown、HTML、API、ファイル名などは許容するが、`Web`、`Status`、`Conversation Seeds`のような見出しは日本語の不整合として報告する。
+
+### 未設定のまま使おうとした場合
+
+五つの操作を実行する前に、プロジェクト用設定、利用者共通設定、旧設定、または依頼で指定された保存先があるかを確認する。設定がないからといって、既定の`knowledge/`へ黙って新しいWikiを作らない。
+
+設定も既定フォルダーもない場合、`query`、`lint`、`what's up`では、読む対象がまだないことを説明し、次の二つを提案する。
+
+- このプロジェクトの`knowledge/`へ保存する
+- `~/WikiGarden/`など、複数のプロジェクトで共有する場所へ保存する
+
+`ingest`と`nurture`では、利用者がどちらを使うか選ぶまで、ファイルを書き込まない。保存先と対象範囲が明確になったら、まず初期設定を行い、その後に元の依頼を続ける。
+
+設定はないが既存の知識フォルダーが見つかった場合、読み取りだけの操作では推定して使ったことを伝え、設定の診断を勧める。知識を書き換える操作では、そのフォルダーをプロジェクト用として採用するか、別の場所を選ぶかを確認してから進める。既存知識を自動で置き換えたり移動したりしない。
+
+### 低水準の設定操作
+
+次を支援する。
+
+```text
+set_knowledge_path
+get_knowledge_path
+set_knowledge_path --project
+set_knowledge_locale
+get_knowledge_locale
+set_knowledge_locale --project
 ```
 
-### 10.4 decision template
+設定の表示操作は、ファイルを作成または変更しない。
 
-```markdown
----
-type: decision
-scope: project
-status: proposed
-date:
----
+既存知識の移動は自動で行わず、必要なら知識更新案として提示する。
 
-# Decision title
+## 16. 配布
 
-## Context
+正本:
 
-## Decision
-
-## Alternatives
-
-## Consequences
-
-## Possible global lesson
+```text
+.agents/skills/wiki-garden/
 ```
 
-### 10.5 log.md
+配布用の複製:
 
-```markdown
-# Log
-
-## YYYY-MM-DD
-
-- Updated ...
-- Added ...
-- Moved ...
+```text
+skills/wiki-garden/
 ```
 
-### 10.6 HTML artifact
+正本を先に変更し、その後で配布用の複製を同期する。
 
-HTML 知識ページは、関連 Markdown と同じ意味的フォルダに置く。
-
-```html
-<!doctype html>
-<html lang="en" data-scope="project">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Knowledge Artifact Title</title>
-</head>
-<body>
-  <main>
-    <header>
-      <h1>Knowledge Artifact Title</h1>
-      <p>Scope: project | Last updated: YYYY-MM-DD</p>
-      <p>Short purpose of this structural explanation.</p>
-    </header>
-
-    <section>
-      <h2>Overview</h2>
-      <p>Describe what this artifact explains and how to read it.</p>
-    </section>
-
-    <section>
-      <h2>Related Knowledge</h2>
-      <ul>
-        <li><a href="index.md">Nearest index</a></li>
-      </ul>
-    </section>
-
-    <section>
-      <h2>Sources</h2>
-      <ul>
-        <li>Add source references when available.</li>
-      </ul>
-    </section>
-  </main>
-</body>
-</html>
-```
-
----
-
-## 11. インストール要件
-
-### 11.1 Vercel Labs `npx skills`
-
-標準インストール方法として、以下を README に記載する。
+導入例:
 
 ```bash
 npx skills add hachiware-labs/wiki-garden
-```
-
-特定エージェント向け:
-
-```bash
 npx skills add hachiware-labs/wiki-garden -a claude-code -a codex
-```
-
-グローバルインストール:
-
-```bash
 npx skills add hachiware-labs/wiki-garden -g
 ```
 
-一覧確認:
+## 17. 対象外
 
-```bash
-npx skills list
-```
+現時点では次を実装しない。
 
-### 11.2 Codex
+- 専用データベース
+- ベクトル検索
+- 会話の自動保存
+- ウェブ画面
+- MCPサーバー
+- 組み込みの定期実行機能
+- 複雑な専用CLI
+- 原資料の自動取得機能
 
-Codex 向けには、以下をサポートする。
+定期的なタネ探しは、実行環境側の定期処理からWiki Gardenを呼び出して行う。
 
-```text
-.agents/skills/wiki-garden/SKILL.md
-```
+## 18. 成功条件
 
-Codex では `$` による Skill mention、`/skills` からの明示呼び出し、description による暗黙呼び出しが可能である想定。
-
-### 11.3 Claude Code
-
-Claude Code 向けには、次を想定する。
-
-```text
-~/.claude/skills/wiki-garden/SKILL.md
-```
-
-または `npx skills` による配置。
-
----
-
-## 12. README 要件
-
-README には以下を含める。
-
-- Skill の目的
-- Karpathy LLM Wiki からの影響
-- セッションを保存しない方針
-- global / project-local の説明
-- Markdown と HTML 知識ページの使い分け
-- knowledge locale の説明
-- ingest / query / lint / refine の説明
-- 知識ベースの推奨ディレクトリ構成
-- `npx skills` でのインストール方法
-- Claude Code / Codex での利用方法
-- 使用例
-- 設計上の非目標
-
----
-
-## 13. 非目標
-
-MVP では以下をやらない。
-
-- 専用 DB の実装
-- ベクトル検索の実装
-- セッションログの自動保存
-- Web UI
-- MCP サーバー
-- GitHub Actions による自動知識更新
-- 複雑な CLI ツール本体
-- raw source の自動ダウンロード
-
-Skill としてまず成立させる。
-
----
-
-## 14. 将来拡張
-
-将来的には以下を検討する。
-
-- CLI wrapper: `kg ingest` / `kg query` / `kg lint` / `kg refine`
-- Obsidian 向けテンプレート
-- GitHub Actions での定期 lint
-- project-local knowledge の global 昇格候補抽出
-- frontmatter 標準化
-- source citation 管理
-- optional `raw/sessions` 保存
-- search backend 連携
-- MCP server 化
-- skills.sh への登録
-
----
-
-## 15. 成功条件
-
-MVP の成功条件は以下。
-
-1. GitHub リポジトリから `npx skills add` で導入できる
-2. Claude Code / Codex の両方で Skill として認識される
-3. `ingest` / `query` / `lint` / `refine` の4操作が説明されている
-4. セッションを保存せず、知見だけを正規ページへ反映する方針が明確
-5. global knowledge と project-local knowledge の分離が明確
-6. Markdown と HTML を同じ知識構造内に並べて扱える
-7. 既存 Markdown Wiki に対して小さな差分で更新できる
-8. README を読めば使い始められる
-
----
-
-## 16. 最小 MVP
-
-最初に作るべきファイルは、これで十分。
-
-```text
-wiki-garden/
-  README.md
-  LICENSE
-  .agents/
-    skills/
-      wiki-garden/
-        SKILL.md
-        SCHEMA.md
-        templates/
-          global-index.md
-          global-log.md
-          project.md
-          project-index.md
-          project-context.md
-          decision.md
-          lesson.md
-          html-artifact.html
-          config.md
-```
-
-MVP では実行スクリプトなしでよい。  
-Skill 本文だけで、Claude Code / Codex / Vercel `npx skills` の流れに乗せるのが最短である。
-
----
-
-## 17. 初期 README 冒頭案
-
-```markdown
-# Wiki Garden
-
-Wiki Garden is a Karpathy-inspired agent skill for maintaining a persistent Markdown knowledge base.
-
-It helps AI coding agents ingest sources, query existing knowledge, lint knowledge quality, and refine canonical wiki pages.
-
-The skill separates global knowledge from project-local knowledge.
-
-It does not archive conversations as knowledge. Instead, it extracts durable information from the current work session or specified files and applies it to canonical Markdown pages.
-```
-
----
-
-## 18. 初期タグライン
-
-```text
-Do not preserve conversations. Preserve distilled knowledge.
-```
-
-または、
-
-```text
-A Karpathy-inspired skill for maintaining Markdown knowledge.
-```
+1. GitHubリポジトリから導入できる
+2. Claude CodeとCodexで機能として認識される
+3. 五操作の役割と変更範囲が明確である
+4. 会話を保存せず、長く役立つ知識だけを正規ページへ反映する
+5. 全体知識とプロジェクト固有知識を分ける
+6. Markdownと静的HTMLを同じ知識構造で扱える
+7. 日本語では固有名や識別子以外を自然な日本語で書く
+8. 対話のタネを定期的に用意し、根拠を確認して提示できる
+9. 明確な問いには最大15分の事前調査を使える
+10. 正規知識への変更を小さく確認しやすく保つ

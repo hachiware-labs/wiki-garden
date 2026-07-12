@@ -125,7 +125,7 @@ Use project-local knowledge for constraints, decisions, terms, artifacts, lesson
   docs/
 ```
 
-Raw sources are source material inside the selected knowledge root. Do not rewrite them during ingest, query, lint, or refine. Link to them from source summaries and canonical pages when useful.
+Raw sources are source material inside the selected knowledge root. Do not rewrite them during query, ingest, lint, nurture, or what's up. Link to them from source summaries and canonical pages when useful.
 
 For web sources, keep enough raw metadata to identify the captured source later:
 
@@ -184,7 +184,60 @@ Markdown pages should be concise and durable. Prefer stable topic pages over ses
 
 Write Markdown pages in the knowledge locale. When source material is in another language, include important original terms on first use and preserve source references.
 
+For Japanese knowledge, use natural Japanese headings and field labels. English is reserved for proper names, product names, operation or code identifiers, API names, file paths, original source titles, and terms whose English form is required for precision. Translate ordinary schema vocabulary, including source, summary, scope, status, global/project-local knowledge, open question, and conversation seed. Do not copy English template headings or labels into Japanese pages.
+
 Concept, method, and comparison pages should be maintained as cross-source synthesis pages, not just topic definitions. When ingest adds a relevant source, update these pages with common patterns, contradictions, refinements, complementary evidence, and questions that only become visible across multiple sources.
+
+## Conversation Seeds
+
+Conversation seeds support `what's up`. They are transient prompts for future user collaboration, not canonical claims or session archives.
+
+Unless a knowledge base defines another convention, store a small set under a localized heading in the relevant file: `## Conversation Seeds` for English or `## 対話のタネ` for Japanese. When maintaining Japanese knowledge, migrate the legacy English heading rather than creating two sections.
+
+```text
+<knowledge-root>/global/open-questions.md
+<knowledge-root>/projects/<project-name>/open-questions.md
+```
+
+Recommended seed shape for English knowledge:
+
+```markdown
+### Topic title
+
+- Type: question | observation | tension | connection | proposal | research | revisit
+- Status: ready | research-pending | researched | deferred
+- Why now: why this matters now
+- Related knowledge: links to relevant pages
+- Prompt: what to discuss with the user
+- Research note: motivating question, sources, and date when researched
+```
+
+Recommended seed shape for Japanese knowledge:
+
+```markdown
+### 話題の名前
+
+- 種類: 質問 | 観察 | 考えのずれ | 接続 | 提案 | 調査 | 再検討
+- 状態: 準備済み | 調査待ち | 調査済み | 保留
+- 今扱う理由: なぜ今この話題を扱うのか
+- 関連知識: 関連ページへのリンク
+- 対話のきっかけ: ユーザーと何を話したいか
+- 調査メモ: 事前調査した場合の問い、資料、調査日
+```
+
+Seed rules:
+
+- keep only a small current set, normally three to seven per relevant scope
+- deduplicate seeds and remove weak, stale, or resolved items
+- preserve source URLs, titles, and dates for researched seeds
+- keep pre-research bounded: absent another budget, allow up to fifteen minutes for one focused question and normally two or three authoritative sources; stop earlier when the seed is useful
+- if research exceeds its execution budget, retain a `research-pending` seed without unsupported partial findings
+- do not treat a researched seed as canonical truth
+- link distinct evidence for each claimed repeated pattern across decisions or projects; a page that merely repeats the claim is not sufficient evidence
+- when evidence is incomplete, record and present the exact evidence that was verified and label the broader pattern as a hypothesis to investigate
+- do not invent examples, project occurrences, or causal explanations when presenting a seed
+- do not store conversation transcripts or generic session summaries
+- when discussion produces durable knowledge, move the conclusion into canonical pages through ingest or nurture and resolve the seed
 
 Recommended metadata for decision pages:
 

@@ -1,312 +1,178 @@
 # Wiki Garden
 
-[English README](README.md)
+[English](README.md)
 
-Wiki Garden は、Karpathy の LLM Wiki の考え方に影響を受けた、Markdown-first の永続知識ベースを運用するための agent skill です。
+会話や資料から得た知識を、記録したまま眠らせず、問い直しながら育てるためのスキルです。
 
-AI コーディングエージェントが、外部ソースや対話中に生まれた有用な知見を `ingest` し、既存知識を `query` し、品質を `lint` し、正規 wiki ページを `refine` できるようにします。知識は、複数プロジェクトで再利用できる global knowledge と、特定プロジェクトだけで有効な project-local knowledge に分けて扱います。
+Wiki Garden は、Andrej Karpathy の LLM Wiki が示した `query`、`ingest`、`lint` を受け継ぎます。さらに、選んだ知識を育てる `nurture` と、Wiki Garden が見つけた話題を聞く `what's up` を加えました。
 
-会話を保存しない。知識へ蒸留して残す。
+## まず一つの資料を育ててみる
 
-## なぜ Wiki Garden か
-
-Andrej Karpathy は、LLM が維持する wiki という考え方を示しています。すべてのチャットを一時的な context として使い捨てるのではなく、source、質問、作業セッションから、後で読み返せる wiki を育てていくという考え方です。
-
-ここで残すべき単位は、チャットの transcript ではありません。後から読めて、検証できて、リンクできて、再利用できるように整えられた知識です。
-
-Wiki Garden は、その考え方をコーディングエージェントや調査エージェントの実運用に落とし込みます。
-
-- raw source を残し、あとから根拠へ戻れるようにする
-- 1ソース1ページの summary を作り、raw material と再利用知識の橋渡しにする
-- concept / method / comparison / project ページに、複数ソースを横断した理解を蓄積する
-- エージェントとの対話から生まれた知見も、会話ログではなく正規知識として残す
-- `lint` と `refine` によって、育っていく wiki の整合性を保つ
-
-コーディングエージェントとの作業では、設計判断、制約、デバッグで分かったこと、実装上の注意、命名規則、API の使い方、未解決の問いなどが頻繁に生まれます。これらをチャット履歴に閉じ込めておくと、次の作業では見つけにくくなります。Wiki Garden は、それらを適切な正規ページへ蒸留するためのスキルです。
-
-## Karpathy の LLM Wiki パターン
-
-Karpathy の `llm-wiki` gist は、完成したプロダクトではなく、知識ベース運用のパターンを示す idea file です。中心にあるのは、query-time reconstruction から ingest-time compilation への転換です。
-
-一般的な RAG では、質問が来たときに raw document から関連 chunk を検索し、その場で答えを合成します。この方法は有効ですが、同じ理解を何度も作り直すことになります。LLM Wiki では、LLM が curated source を事前に読み、永続的で相互リンクされた Markdown wiki へ少しずつ compile します。後続の質問では、まず compile 済みの wiki を読み、必要な場合だけ raw source に戻ります。
-
-元のパターンは、3つの層で説明できます。
-
-- `raw` sources: 記事、論文、画像、データファイルなどの curated source。immutable であり、source of truth として扱う。
-- `wiki`: LLM が維持する Markdown layer。source summary、concept page、entity page、comparison、overview、synthesis、index、log などを含む。
-- `schema`: `CLAUDE.md` や `AGENTS.md` のような運用契約。wiki の構造、命名規則、ingest / query / maintenance の手順を agent に伝える。
-
-操作は主に3つです。
-
-- `ingest`: 新しい source を `raw` に置き、LLM が読み、重要点を確認し、summary page を書き、関連する concept / entity page を更新し、`index.md` と `log.md` を更新する。Karpathy は、1つの source が 10-15 個程度の wiki page に影響することがあるため、1つずつ確認しながら ingest する運用を好むと述べています。
-- `query`: wiki に対して質問する。agent は index から始め、関連 page を読み、citation 付きで回答を合成する。価値ある回答は、新しい synthesis page や comparison page として wiki に戻せる。
-- `lint`: wiki の health check を行う。矛盾、古くなった claim、孤立 page、存在すべき concept page の欠落、cross-reference 不足、追加調査で埋められる data gap などを探す。
-
-元パターンでは、特に2つのファイルが重要です。
-
-- `index.md`: content-oriented navigation。page 一覧と短い説明を持ち、agent が読むべき page を判断する入口になる。
-- `log.md`: chronological operational history。ingest、query、lint の履歴を追記し、人間と agent の両方が wiki の進化を把握できるようにする。
-
-このパターンでも、人間の役割は残ります。人間は source を選び、良い問いを立て、重要な summary を確認し、何を強調すべきかをガイドします。LLM は、要約、リンク付け、cross-reference、更新、整合性チェックといった反復的な維持作業を担います。
-
-Wiki Garden はこの考え方に従いつつ、agent skill とコーディング作業向けに調整しています。設定された knowledge root の中に `raw/` を置き、明示的な `sources/` summary layer を追加し、global knowledge と project-local knowledge を分け、`knowledge_locale` をサポートします。また、コーディングエージェントとの対話から生まれた有用な知見も ingest 候補として扱います。この最後の点は Wiki Garden の拡張です。対話を ingest する場合も、保存するのは会話ログではなく、再利用可能な知識だけです。
-
-## 何をするか
-
-Wiki Garden は、ファイル、Web ページ、論文、現在の作業、エージェントとの対話から得た有用な情報を、永続的な知識ベースへ変換します。
-
-知識ベースは Markdown-first ですが、Markdown-only ではありません。source summary、概念説明、decision、lesson、index、open question には Markdown を使います。図、タイムライン、マップ、マトリクス、軽量なインタラクションが理解を助ける場合は、静的 HTML を正規の知識ページとして使えます。
-
-## コア操作
-
-- `ingest`: raw source を保持または読み取り、必要に応じて 1ソース1ページの summary を作り、横断知識を正規ページへ統合します。エージェントとの対話から生まれた永続的な知見も ingest できます。
-- `query`: source summary、project-local knowledge、global knowledge を読んで、現在の問いに答えます。
-- `lint`: 矛盾、古さ、根拠不足、翻訳ゆれ、scope 混入、孤立ページ、リンク切れなどを検出します。
-- `refine`: 重複統合、分割、移動、index 整理、相互リンク追加、構造説明の HTML 化などで知識ベースを洗練します。
-
-`set_knowledge_path` は、グローバルインストールされた skill が共通 knowledge root を使うためのセットアップ操作です。デフォルトでは `~/wiki-garden.config.md` に保存します。
-
-`set_knowledge_locale` は、知識ページの正規言語を設定します。raw source は原文のまま保持し、再利用する知識だけを設定ロケールへ蒸留できます。
-
-## 対話の Ingest
-
-Wiki Garden は、AI コーディングエージェントとの対話から知見を ingest できます。ただし、会話そのものは保存しません。
-
-対話から ingest する対象は、たとえば次のような durable knowledge です。
-
-- プロジェクトの制約や前提
-- 意思決定とその影響
-- デバッグで分かったこと
-- 実装上の lesson
-- architecture や API に関するメモ
-- ローカルな用語
-- 再利用できる method や principle
-- 追跡すべき open question
-
-対話からの ingest は、通常、source summary を作らずに正規知識ページへ直接反映します。
-
-```text
-current agent conversation
-  ↓ durable insight だけを ingest
-global/ または projects/<project>/
-```
-
-作ってはいけないものは、transcript page、chat archive、汎用的な session summary です。その場限りの情報は捨てます。再利用できる知識だけを、未来の作業者が探しに行く場所へ置きます。たとえば `context.md`、`decisions/`、`lessons.md`、`open-questions.md`、`global/concepts/`、`global/methods/`、安定した topic page などです。
-
-外部ソースの ingest は別の流れです。
-
-```text
-raw/sources/
-  ↓
-sources/<type>/
-  ↓
-global/ または projects/<project>/
-```
-
-論文、記事、Web ページ、仕様書、ドキュメントなどには、この source-summary flow を使います。エージェントとの共同作業で生まれた知識には、conversation-insight flow を使います。
-
-## メソッド
-
-| Method | 目的 | 例 |
-| --- | --- | --- |
-| `set_knowledge_path` | 複数プロジェクトで共有する knowledge root を設定する。デフォルトでは `~/wiki-garden.config.md` に保存する。 | `Use $wiki-garden set_knowledge_path ~/WikiGarden` |
-| `get_knowledge_path` | 現在有効な knowledge root と、それを選んだ設定元を表示する。ファイルは変更しない。 | `Use $wiki-garden get_knowledge_path` |
-| `set_knowledge_path --project` | 現在のリポジトリだけで使う knowledge root を設定する。リポジトリルートの `wiki-garden.config.md` に保存する。 | `Use $wiki-garden set_knowledge_path --project docs/wiki` |
-| `set_knowledge_locale` | Markdown / HTML の正規知識ページで使う中心言語を設定する。外国語ソースはこのロケールへ蒸留して取り込む。 | `Use $wiki-garden set_knowledge_locale ja-JP` |
-| `get_knowledge_locale` | 現在有効な knowledge locale と、それを選んだ設定元を表示する。ファイルは変更しない。 | `Use $wiki-garden get_knowledge_locale` |
-| `set_knowledge_locale --project` | 現在のリポジトリだけで使う knowledge locale を設定する。 | `Use $wiki-garden set_knowledge_locale --project en-US` |
-| `ingest` | raw source を保持または参照し、必要なら source summary を作り、永続知識を Markdown または HTML の正規ページへ統合する。 | `Use $wiki-garden to ingest docs/api-notes.md into the checkout-redesign project.` |
-| `query` | source summary、global knowledge、project-local knowledge を読み、現在の問いに必要な文脈を取得する。関連 HTML 知識ページも対象にする。 | `Use $wiki-garden to query what we know about retrieval pipeline tradeoffs.` |
-| `lint` | 矛盾、古さ、根拠不足、翻訳ゆれ、scope 混入、リンク切れ、孤立ページ、孤立 HTML を検出する。 | `Use $wiki-garden to lint knowledge/ for stale claims.` |
-| `refine` | 重複統合、分割、移動、用語統一、index/log 整理、相互リンク追加、構造説明の HTML 化などで知識ベースを洗練する。 | `Use $wiki-garden to refine the checkout-redesign project knowledge.` |
-
-`set_knowledge_path` のエイリアス: `set_path`, `set-root`, `configure root`。
-
-## Knowledge Base Layout
-
-Wiki Garden は設定可能な knowledge root を使います。ユーザーが path を指定した場合はそれを使います。プロジェクト設定がある場合はそれを使います。なければユーザー共通設定を使います。何も設定がなければ、デフォルトは `knowledge/` です。
-
-デフォルトでは `.knowledge/` のような dot-prefixed folder は作りません。Obsidian などのツールで見えにくくなるためです。明示的に設定された場合や既存構造として存在する場合は `.knowledge/` も使えます。
-
-```text
-knowledge/
-  raw/
-    sources/
-      papers/
-      articles/
-      web/
-      docs/
-  sources/
-    index.md
-    papers/
-    articles/
-    web/
-    docs/
-  global/
-    index.md
-    log.md
-    concepts/
-      *.md
-      *.html
-    principles/
-      *.md
-      *.html
-    methods/
-      *.md
-      *.html
-    comparisons/
-      *.md
-      *.html
-    glossary.md
-    open-questions.md
-  projects/
-    <project-name>/
-      PROJECT.md
-      index.md
-      log.md
-      context.md
-      glossary.md
-      decisions/
-        *.md
-        *.html
-      lessons.md
-      open-questions.md
-      artifacts.md
-      *.html
-```
-
-`raw/` は、選択された knowledge root の中で管理します。これは一次資料の不変層です。人間が論文、記事、Web capture、ドキュメントなどを追加し、エージェントはそれを読みますが、勝手には書き換えません。
-
-`sources/` には、ingest によって作られた 1ソース1ページの summary を置きます。これらの summary は、raw material へ戻るリンクと、concept / method / comparison / decision / project context / open question へのリンクを持ち、一次資料と再利用知識をつなぎます。
-
-HTML の Web ページでは、少なくとも元 URL、取得日、タイトル、保存形式を残します。通常の記事では Markdown の本文抽出を優先し、レイアウトや後日の厳密検証が重要な場合だけ HTML snapshot を追加します。
-
-## Knowledge Locale
-
-Wiki Garden は、設定された `knowledge_locale` を正規知識の言語として使います。たとえば `knowledge_locale: ja-JP` の場合、`ingest` / `query` / `lint` / `refine` は、日本語を中心に知識ページ、レポート、patch、回答を作成します。
-
-外国語ソースは原文のまま保持します。再利用可能な知識だけを knowledge locale に蒸留します。重要な専門用語は初出で原語を併記します。例: `検索拡張生成（Retrieval-Augmented Generation, RAG）`
-
-## HTML Artifacts
-
-HTML artifacts は、構造そのものが知識である場合の first-class knowledge page です。次のような用途に使います。
-
-- architecture map
-- dependency diagram
-- decision tree
-- concept map
-- timeline
-- comparison matrix
-- interactive explainer
-
-HTML artifact は、基本的に自己完結した静的ファイルにします。関連 Markdown と同じ意味的フォルダに置き、別の `html/` bucket は標準では作りません。`index.md` からリンクし、`log.md` に記録し、project-specific HTML は `artifacts.md` にも載せます。
-
-## インストール
-
-Vercel Labs `skills` でインストールします。
-
-```bash
-npx skills add hachiware-labs/wiki-garden
-```
-
-特定 agent 向け:
-
-```bash
-npx skills add hachiware-labs/wiki-garden -a claude-code -a codex
-```
-
-グローバルインストール:
+標準の運用では、Vercel Labs の `skills` を使ってスキルを全体へ導入し、共通の知識置き場を育てます。この行だけは端末で実行するコマンドです。
 
 ```bash
 npx skills add hachiware-labs/wiki-garden -g
 ```
 
-インストール済み skill の確認:
+ここで決めることは二つあります。スキルをどこで使えるようにするかと、Wiki の知識をどこへ保存するかは別の選択です。
+
+| 決めること | プロジェクトごと | すべてのプロジェクトで共有 |
+| --- | --- | --- |
+| スキルの導入先 | 今いるリポジトリだけで使えるようにする | 自分の環境のすべてのリポジトリで使えるようにする |
+| 知識の保存先 | リポジトリ内の `knowledge/` | リポジトリの外にある `~/WikiGarden/` など |
+
+スキルをどこへ導入しても、知識の保存先はそれとは別に選べます。たとえば、スキルは全プロジェクトで使えるようにしながら、知識はプロジェクトごとに `knowledge/` へ置けます。
+
+### まずはこの組み合わせがおすすめ
+
+| 目的 | スキルの導入先 | 知識の保存先 |
+| --- | --- | --- |
+| 標準の運用: 方法、調査、用語などを仕事をまたいで育てたい | すべてのプロジェクト | `~/WikiGarden/` のような共有フォルダー |
+| 特定業務を独立させたい: 顧客案件、機密情報、期限のある仕事 | プロジェクトだけ | リポジトリ内の `knowledge/` |
+| スキルは全体で使いたいが、知識は仕事ごとに分けたい | すべてのプロジェクト | 各リポジトリ内の `knowledge/` |
+
+初期設定では、使いたい保存方法をエージェントに普段の言葉で伝えます。
+
+### 標準の運用: 知識を複数のプロジェクトで共有する
+
+方法、調査資料、用語、設計原則を一か所で育てる場合に向いています。各プロジェクトだけで成り立つ知識は、共有Wikiの `projects/` 以下に分けて残します。
+
+```text
+複数のプロジェクトで共有する Wiki Garden を初期設定して。
+知識は~/WikiGardenに保存し、日本語で記述して。
+```
+
+この設定では、利用者のホームフォルダーにある `~/wiki-garden.config.md` が保存先を示し、実際の知識は `~/WikiGarden/` に入ります。通常はリポジトリの外にある個人用の知識として扱います。共有したい場合は、そのフォルダー自体を別の安全な同期方法で管理してください。
+
+### 例外: 特定業務の知識を独立させる
+
+顧客案件、機密情報、寿命が限られた業務など、他の仕事と混ぜない方がよい知識はプロジェクト内に置きます。
+
+```text
+Wiki Garden をこのプロジェクト用に初期設定して。
+知識はknowledge/に保存し、日本語で記述して。
+```
+
+この設定では、リポジトリ直下の `wiki-garden.config.md` が保存先を示し、実際の知識は `knowledge/` に入ります。チームで共有したい場合は、設定ファイルと `knowledge/` をリポジトリに含めます。
+
+どちらの場合も、設定後に保存先と記述言語を確認できます。これは読み取り専用の確認で、既存のファイルを変更しません。
+
+```text
+Wiki Garden の設定を診断して。
+ファイルは変更せず、保存先と記述言語を確認して。
+```
+
+まだ初期設定していない状態で知識を検索したり、資料を取り込もうとしたりしても、Wiki Garden は新しい保存先を黙って作りません。プロジェクト内の `knowledge/` と共有フォルダーのどちらを使うかを尋ね、選んだ後に初期設定してから元の依頼を続けます。
+
+手元の資料を一つ選び、取り込んでください。
+
+```text
+docs/api-notes.md を Wiki Garden に取り込んで。
+```
+
+これで原資料を残したまま、資料ごとの要約と、後から再利用できる知識が作られます。詳しい手順は[日本語チュートリアル](docs/tutorial_ja.md)で、支払い API の設計メモを題材に試せます。
+
+## 何が変わるのか
+
+通常の知識ベースは、人が資料や質問を持ち込むまで待っています。Wiki Garden は、それに加えて、知識の不足や食い違い、まだ結び付いていない考えを見つけ、次に話す価値があることを準備します。
+
+```text
+資料や対話
+  → 長く役立つ知識を取り込む
+  → 問いや食い違いを見つける
+  → 「何かある？」で一つ話す
+  → 対話や調査を通して育てる
+  → 確かになった知識を残す
+```
+
+Wiki が勝手に結論を増やす仕組みではありません。気づきや調査結果はまず「対話のタネ」として用意し、何を育てるか、どこまで正規の知識にするかは人と一緒に決めます。
+
+## 五つの操作
+
+操作名を覚える必要はありません。したいことを普段の言葉で伝えれば、Wiki Garden が適切な操作として扱います。
+
+| 操作 | 使う場面 | 普段の言葉による依頼例 | 知識の変更 |
+| --- | --- | --- | --- |
+| `query` | 今ある知識から答えてほしい | 「支払い再試行について、今分かっていることを教えて」 | しない |
+| `ingest` | 資料や、会話で決まったことを残したい | 「この設計メモをWiki Gardenに取り込んで」 | する |
+| `lint` | 矛盾、古さ、根拠不足、育てどころを知りたい | 「知識に矛盾や足りないところがないか点検して」 | しない |
+| `nurture` | 一つの話題を、整理・対話・調査によって育てたい | 「冪等性についての知識を、私にも確認しながら深めて」 | 小さく行う |
+| `what's up` | Wiki が見つけた話題を一つ聞きたい | 「Wiki Garden、何かある？」 | 提示だけならしない |
+
+たとえば `lint` が「この判断には理由が書かれていない」と見つけたら、`nurture` は既存のページを読み、必要ならあなたに理由を尋ねます。外部の根拠が必要なら、問いを絞って調査します。結論は、小さく確認できる変更として知識へ戻します。
+
+`what's up` は、定期的に用意された少数の対話のタネから、今話す価値が高いものを一つだけ提示します。
+
+```text
+Wiki Garden、何かある？
+```
+
+知識の中ですでに問いが明確なら、タネを準備する段階で深い調査を使えます。専用の調査機能があれば優先し、なければ利用できる検索手段を使います。特に指定がなければ、一つの問いに絞り、信頼できる資料を通常は二、三件、最大十五分まで確認します。終わらなければ、分かったふりをせず「調査待ち」として残します。
+
+## Karpathy の考えをどう広げたか
+
+Karpathy の LLM Wiki は、質問のたびに原資料を読み直す代わりに、資料をあらかじめ相互に結び付いた Markdown の知識へまとめる運用方法です。原資料は根拠として残し、`ingest` で知識へ編み直し、`query` で読み、`lint` で健康状態を確かめます。
+
+Wiki Garden はこの土台を変えません。加えたのは「次に何を育てるか」を Wiki と人が一緒に見つける循環です。会話そのものは保存せず、判断、制約、教訓、用語、未解決の問いなど、後の仕事でも役立つ内容だけを残します。
+
+## 知識はどこに置かれるか
+
+初期設定では、次の役割に分けて保存します。
+
+```text
+knowledge/
+  raw/sources/       原資料。取り込み後も書き換えない
+  sources/           資料ごとの要約
+  global/            複数の仕事で使える知識
+  projects/          特定のプロジェクトだけで成り立つ知識
+```
+
+フォルダー名は互換性のため英語ですが、`ja-JP` を選んだ場合、見出し、本文、索引、点検結果、対話のタネは自然な日本語で書きます。英語を残すのは固有名、製品名、API 名、コード、ファイル名など、原語が必要なものだけです。
+
+文章、判断、教訓には Markdown を使います。構成図、時系列、比較図など、関係そのものが知識になる場合は静的 HTML も使えます。
+
+## スキルの導入先を選ぶ
+
+上の最初の導入コマンドは、スキルを全体へ導入します。保存先や記述言語だけを個別に変える操作もありますが、通常は冒頭の初期設定で十分です。現在の設定が分からなくなったら、設定の診断を頼んでください。
+
+特定のプロジェクトだけへ導入する場合は、`-g` を付けません。
+
+```bash
+npx skills add hachiware-labs/wiki-garden
+```
+
+導入先を Claude Code と Codex に限る場合:
+
+```bash
+npx skills add hachiware-labs/wiki-garden -a claude-code -a codex
+```
+
+すべてのプロジェクトから使う場合は、`-g` を付けます。
+
+```bash
+npx skills add hachiware-labs/wiki-garden -g
+```
+
+導入済みのスキルの確認と更新:
 
 ```bash
 npx skills list
+npx skills update wiki-garden
 ```
 
-## Repository Entrypoints
+## 次に読む
 
-このリポジトリの canonical skill source は次です。
+- [日本語チュートリアル](docs/tutorial_ja.md) — 一つの資料を取り込み、質問し、点検し、育てるまで
+- [要件定義](docs/wiki-garden-requirements.md) — 操作ごとの詳しい決まり
+- [英語版の案内](README.md) — 英語で読みたい場合
 
-```text
-.agents/skills/wiki-garden/
-```
+スキルの正本は `.agents/skills/wiki-garden/`、配布用の複製は `skills/wiki-garden/` にあります。変更するときは正本を先に直します。
 
-トップレベルの `skills/wiki-garden/` は、`skills/<skill-name>/` レイアウトを期待する配布ツールやユーザー向けの mirror です。
+## 現在の境界
 
-Skill を更新するときは、まず `.agents/skills/wiki-garden/` を編集し、その後 `skills/wiki-garden/` を同期します。
-
-## 使用例
-
-外部ソースを project knowledge へ ingest する:
-
-```text
-Use $wiki-garden to ingest docs/api-notes.md into the checkout-redesign project.
-```
-
-現在のコーディングエージェント対話から durable lesson を ingest する:
-
-```text
-Use $wiki-garden to ingest the durable lessons from this session into the wiki-garden project.
-```
-
-共通 knowledge root を設定する:
-
-```text
-Use $wiki-garden set_knowledge_path ~/WikiGarden
-```
-
-現在有効な knowledge root を確認する:
-
-```text
-Use $wiki-garden get_knowledge_path
-```
-
-共通 knowledge locale を設定する:
-
-```text
-Use $wiki-garden set_knowledge_locale ja-JP
-```
-
-現在有効な knowledge locale を確認する:
-
-```text
-Use $wiki-garden get_knowledge_locale
-```
-
-プロジェクト固有の root を設定する:
-
-```text
-Use $wiki-garden set_knowledge_path --project notes
-```
-
-既存知識を query する:
-
-```text
-Use $wiki-garden to query what we know about retrieval pipeline tradeoffs.
-```
-
-Markdown だけでは足りない構造説明を HTML artifact にする:
-
-```text
-Use $wiki-garden to turn this architecture explanation into a project-local HTML dependency map.
-```
-
-知識ベースを lint する:
-
-```text
-Use $wiki-garden to lint knowledge/ for scope leaks, orphan HTML artifacts, stale claims, and translation drift.
-```
-
-## 非目標
-
-MVP では、database、vector search、自動 session logging、Web UI、MCP server、GitHub Actions automation、raw source の自動 download は実装しません。Wiki Garden は、Markdown と静的 HTML の知識ベースを維持する instruction-only skill です。
+Wiki Garden 自体には、専用データベース、ベクトル検索、会話の自動保存、画面、定期実行の仕組みはありません。対話のタネ探しは、Codex や Claude Code など、利用する環境の定期処理から呼び出します。
 
 ## 参考
 
 - Andrej Karpathy, [`llm-wiki` gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
 - DAIR.AI Academy, [LLM Knowledge Bases](https://academy.dair.ai/blog/llm-knowledge-bases-karpathy)
-- Denser.ai, [From RAG to LLM Wiki](https://denser.ai/blog/llm-wiki-karpathy-knowledge-base/)
